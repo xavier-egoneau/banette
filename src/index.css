@@ -1,0 +1,209 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Drag region for frameless window */
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Paper lines effect */
+.editor-paper {
+  background-color: #FFF8E7;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 27px,
+    #E8D9A0 27px,
+    #E8D9A0 28px
+  );
+  background-size: 100% 28px;
+  background-position: 0 16px;
+  background-attachment: local;
+}
+
+/* TipTap editor styles */
+.ProseMirror {
+  min-height: 100%;
+  padding: 16px 20px;
+  outline: none;
+  font-family: Georgia, serif;
+  font-size: 15px;
+  line-height: 28px;
+  color: #3D2E0A;
+}
+
+.ProseMirror p {
+  margin: 0;
+  line-height: 28px;
+  min-height: 28px;
+}
+
+.ProseMirror h1 {
+  font-size: 1.5em;
+  font-weight: bold;
+  color: #3D2E0A;
+  margin: 8px 0 4px;
+  line-height: 1.4;
+}
+
+.ProseMirror h2 {
+  font-size: 1.25em;
+  font-weight: bold;
+  color: #5C4A1E;
+  margin: 8px 0 4px;
+  line-height: 1.4;
+}
+
+.ProseMirror h3 {
+  font-size: 1.1em;
+  font-weight: bold;
+  color: #5C4A1E;
+  margin: 4px 0 2px;
+}
+
+.ProseMirror strong {
+  font-weight: bold;
+  color: #3D2E0A;
+}
+
+.ProseMirror em {
+  font-style: italic;
+}
+
+.ProseMirror s {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.ProseMirror blockquote {
+  border-left: 3px solid #D4C078;
+  padding-left: 12px;
+  margin-left: 0;
+  color: #8B7355;
+  font-style: italic;
+}
+
+.ProseMirror ul {
+  padding-left: 20px;
+  list-style-type: disc;
+}
+
+.ProseMirror ol {
+  padding-left: 20px;
+  list-style-type: decimal;
+}
+
+.ProseMirror li {
+  line-height: 28px;
+}
+
+.ProseMirror hr {
+  border: none;
+  border-top: 1px solid #D4C078;
+  margin: 8px 0;
+}
+
+.ProseMirror code {
+  font-family: 'Courier New', monospace;
+  background: rgba(212, 192, 120, 0.3);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+.ProseMirror pre {
+  background: rgba(212, 192, 120, 0.2);
+  border: 1px solid #D4C078;
+  border-radius: 6px;
+  padding: 12px;
+  overflow-x: auto;
+}
+
+.ProseMirror pre code {
+  background: none;
+  padding: 0;
+}
+
+/* Task list styles */
+.ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 28px;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label {
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #D4C078;
+  border-radius: 3px;
+}
+
+.ProseMirror ul[data-type="taskList"] li > div {
+  flex: 1;
+}
+
+.ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+/* Placeholder */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #B8A882;
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D4C078;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #B8A070;
+}
+
+/* Remove default focus ring */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #FFF8E7;
+}
+
+#root {
+  height: 100vh;
+  overflow: hidden;
+}
