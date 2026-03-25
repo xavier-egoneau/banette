@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Background rounded -->
+  <rect width="256" height="256" rx="52" fill="#F5E6C0"/>
+
+  <!-- Subtle paper texture lines -->
+  <rect x="0" y="0" width="256" height="256" rx="52" fill="url(#grain)" opacity="0.15"/>
+
+  <!-- Notebook shadow/depth -->
+  <rect x="44" y="40" width="168" height="184" rx="14" fill="#D4B96A" opacity="0.35"/>
+
+  <!-- Notebook body -->
+  <rect x="40" y="36" width="168" height="184" rx="14" fill="#FFFBF0"/>
+  <rect x="40" y="36" width="168" height="184" rx="14" fill="none" stroke="#C9A84C" stroke-width="2.5"/>
+
+  <!-- Spiral binding left -->
+  <rect x="40" y="36" width="28" height="184" rx="12" fill="#E8D490" opacity="0.6"/>
+  <rect x="40" y="36" width="28" height="184" rx="0" fill="none" stroke="#C9A84C" stroke-width="1.5" opacity="0.5"/>
+
+  <!-- Spiral rings -->
+  <circle cx="54" cy="74"  r="7" fill="none" stroke="#8B6914" stroke-width="3"/>
+  <circle cx="54" cy="104" r="7" fill="none" stroke="#8B6914" stroke-width="3"/>
+  <circle cx="54" cy="134" r="7" fill="none" stroke="#8B6914" stroke-width="3"/>
+  <circle cx="54" cy="164" r="7" fill="none" stroke="#8B6914" stroke-width="3"/>
+  <circle cx="54" cy="194" r="7" fill="none" stroke="#8B6914" stroke-width="3"/>
+
+  <!-- Spiral ring holes -->
+  <circle cx="54" cy="74"  r="3.5" fill="#C9A84C"/>
+  <circle cx="54" cy="104" r="3.5" fill="#C9A84C"/>
+  <circle cx="54" cy="134" r="3.5" fill="#C9A84C"/>
+  <circle cx="54" cy="164" r="3.5" fill="#C9A84C"/>
+  <circle cx="54" cy="194" r="3.5" fill="#C9A84C"/>
+
+  <!-- Ruled lines on paper -->
+  <line x1="84" y1="90"  x2="192" y2="90"  stroke="#E8D490" stroke-width="2"/>
+  <line x1="84" y1="112" x2="192" y2="112" stroke="#E8D490" stroke-width="2"/>
+  <line x1="84" y1="134" x2="192" y2="134" stroke="#E8D490" stroke-width="2"/>
+  <line x1="84" y1="156" x2="192" y2="156" stroke="#E8D490" stroke-width="2"/>
+  <line x1="84" y1="178" x2="192" y2="178" stroke="#E8D490" stroke-width="2"/>
+
+  <!-- Letter B — stylized, large, centered on the paper area -->
+  <text
+    x="138"
+    y="170"
+    font-family="Georgia, serif"
+    font-size="118"
+    font-weight="700"
+    fill="#5C3D0A"
+    text-anchor="middle"
+    dominant-baseline="auto"
+    opacity="0.92"
+  >B</text>
+</svg>
