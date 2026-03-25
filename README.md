@@ -1,42 +1,35 @@
 # Banette
 
-Application de bureau Windows pour gérer des **notes** et des **todos**, avec un éditeur WYSIWYG et un stockage local en Markdown.
+Application de bureau pour gérer des **notes** et des **todos**, avec un éditeur WYSIWYG et un stockage local en Markdown.
 
 ---
 
 ## Fonctionnalités
 
-### Notes
-- Création, édition et suppression de notes
-- Éditeur de texte enrichi (WYSIWYG) — ce que tu vois est ce qui est sauvegardé
-- Mise en forme : **gras**, *italique*, ~~barré~~, titres, listes, blocs de code, citations, listes de tâches
-- Auto-save : les modifications sont sauvegardées automatiquement après 800 ms d'inactivité
-- Date de création affichée en bas de chaque note (format français)
+### Notes & Todos
+- Création, édition et suppression
+- Éditeur de texte enrichi (WYSIWYG) — **gras**, *italique*, ~~barré~~, titres H1/H2, listes, blocs de code avec coloration syntaxique, citations, listes de tâches
+- Auto-save 800 ms — indicateur "Enregistrement…" / "Sauvegardé"
+- **Todos** : priorité haute / normale / basse, marquage complété/en cours
 
-### Todos
-- Création, édition et suppression de tâches
-- Marquage **complété / en cours** depuis la liste ou depuis le détail
-- **Priorités** : haute (rouge), normale (orange), basse (vert)
-- Éditeur de texte enrichi pour la description de chaque todo
-- Auto-save identique aux notes
+### Organisation
+- **Tags** : ajout de tags par chips (Enter ou virgule), filtre par tag dans la liste
+- **Épingler** : épingler une note ou todo pour la garder en tête de liste
+- **Tri** : manuel (drag & drop), par date de modification, par priorité (todos)
+- **Recherche full-text** : cherche dans le titre et dans le contenu
 
 ### Interface
-- Sidebar avec navigation **Todos** / **Notes**
-- Liste des items avec recherche en temps réel
-- Vue détail au clic sur un item
-- Raccourci clavier `Ctrl+N` pour créer un item
-- Touche `Suppr` ou `Backspace` sur un item sélectionné pour le supprimer
-- **Icône dans la barre des tâches (tray)** : l'application se minimise dans le tray au lieu de se fermer, et reste accessible via un clic ou le menu contextuel
-- Fenêtre sans bordure, style bloc-notes sur fond jaune avec lignes de papier
+- Sidebar navigation **Todos** / **Notes**
+- Raccourci `Ctrl+N` pour créer, `Suppr` / `Backspace` pour supprimer l'item sélectionné
+- **Raccourci global `Cmd+Shift+B`** (ou `Ctrl+Shift+B`) pour ouvrir Banette depuis n'importe quelle app
+- **Mode aperçu** : bascule l'éditeur en lecture seule (bouton 👁 / ✏️)
+- **Export .md** : exporte la note courante vers un fichier Markdown via boîte de dialogue système
+- Icône tray — l'app se minimise dans la barre système au lieu de se fermer
+- Fenêtre sans bordure, esthétique bloc-notes (fond jaune, lignes de papier)
 
 ### Stockage
-- Tous les fichiers sont sauvegardés localement dans `Documents/Banette/`
-  - `Documents/Banette/notes/` — un fichier `.md` par note
-  - `Documents/Banette/todos/` — un fichier `.md` par todo
-- Format : Markdown avec frontmatter YAML (métadonnées + contenu lisible)
-- Aucune donnée n'est envoyée sur internet
-
-Exemple de fichier généré :
+- Fichiers locaux dans `Documents/Banette/` — aucune donnée envoyée sur internet
+- Format : Markdown avec frontmatter YAML
 
 ```markdown
 ---
@@ -44,6 +37,8 @@ id: 3f2a1b...
 title: Ma première note
 created: 2025-01-15T10:00:00.000Z
 updated: 2025-01-15T10:05:00.000Z
+tags: [travail, idées]
+pinned: false
 ---
 
 Contenu de la note en **Markdown**.
@@ -55,11 +50,13 @@ Contenu de la note en **Markdown**.
 
 | Composant | Technologie |
 |-----------|-------------|
-| Runtime desktop | Electron 28 |
+| Runtime desktop | Electron 41 |
 | Bundler | electron-vite |
 | Frontend | React 18 + TypeScript |
 | Styles | TailwindCSS v3 |
 | Éditeur | TipTap 2 + tiptap-markdown |
+| Coloration syntaxique | lowlight + highlight.js |
+| Drag & drop | @dnd-kit |
 | Icônes | FontAwesome 6 |
 | Parsing Markdown | gray-matter |
 | IPC | contextBridge Electron |
@@ -95,15 +92,15 @@ Lance l'application Electron avec hot-reload via electron-vite.
 npm run build
 ```
 
-Compile les sources dans `out/` (main, preload, renderer).
+Compile les sources dans `out/`.
 
-### Packager l'installateur Windows
+### Packager l'installateur
 
 ```bash
 npm run package
 ```
 
-Génère un installateur `.exe` (NSIS) dans `dist/`. Le fichier produit est nommé `banette-<version>-setup.exe`.
+Génère un installateur dans `dist/`.
 
 ---
 
@@ -112,25 +109,27 @@ Génère un installateur `.exe` (NSIS) dans `dist/`. Le fichier produit est nomm
 ```
 banette/
 ├── electron/
-│   ├── main.ts          # Process principal Electron (fenêtre, tray, IPC handlers)
+│   ├── main.ts          # Process principal (fenêtre, tray, IPC, raccourci global)
 │   ├── preload.ts       # Bridge sécurisé renderer ↔ main (contextBridge)
 │   └── fileSystem.ts    # Lecture/écriture des fichiers Markdown
 ├── src/
 │   ├── components/
-│   │   ├── Sidebar.tsx      # Navigation Todos / Notes
-│   │   ├── ItemList.tsx     # Liste des items avec recherche
-│   │   ├── ItemDetail.tsx   # Vue détail + éditeur
-│   │   ├── Editor.tsx       # Éditeur TipTap
-│   │   ├── SearchBar.tsx    # Barre de recherche
-│   │   └── DeleteModal.tsx  # Modale de confirmation suppression
+│   │   ├── Sidebar.tsx           # Navigation Todos / Notes
+│   │   ├── ItemList.tsx          # Liste avec recherche, tri, filtre par tag
+│   │   ├── ItemDetail.tsx        # Vue détail : éditeur, tags, pin, aperçu, export
+│   │   ├── Editor.tsx            # Éditeur TipTap + toolbar
+│   │   ├── CodeBlockComponent.tsx# Bloc de code avec sélecteur de langage
+│   │   ├── SortableItem.tsx      # Item de liste draggable (pin, tags, priorité)
+│   │   ├── SearchBar.tsx         # Barre de recherche
+│   │   └── DeleteModal.tsx       # Modale de confirmation suppression
 │   ├── hooks/
-│   │   └── useAutoSave.ts   # Hook debounce 800ms pour l'auto-save
+│   │   └── useAutoSave.ts        # Hook debounce 800ms pour l'auto-save
 │   ├── types/
-│   │   ├── index.ts         # Types Note, Todo, Priority…
-│   │   └── electron.d.ts    # Déclaration window.electron pour TypeScript
+│   │   ├── index.ts              # Types Note, Todo, Priority…
+│   │   └── electron.d.ts         # Déclaration window.electron pour TypeScript
 │   ├── App.tsx
 │   ├── main.tsx
-│   └── index.css            # Styles ProseMirror + effet lignes de papier
+│   └── index.css                 # Styles ProseMirror + effet lignes de papier
 ├── electron.vite.config.ts
 ├── electron-builder.yml
 ├── tailwind.config.js
@@ -141,16 +140,14 @@ banette/
 
 ## Données utilisateur
 
-Les fichiers sont stockés dans le dossier Documents de l'utilisateur Windows :
-
 ```
-C:\Users\<nom>\Documents\Banette\
-├── notes\
+Documents/Banette/
+├── notes/
 │   ├── <uuid>.md
 │   └── ...
-└── todos\
+└── todos/
     ├── <uuid>.md
     └── ...
 ```
 
-Ces fichiers sont du Markdown standard, lisibles et modifiables avec n'importe quel éditeur de texte.
+Fichiers Markdown standard, lisibles et modifiables avec n'importe quel éditeur de texte.
