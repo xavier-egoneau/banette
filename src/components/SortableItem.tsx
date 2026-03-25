@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faGripVertical, faTrash } from '@fortawesome/free-solid-svg-icons'
+import { faGripVertical, faTrash, faThumbtack } from '@fortawesome/free-solid-svg-icons'
 import { AnyItem, isTodo, Priority } from '../types'
 
 function getPriorityColor(priority: Priority): string {
@@ -31,6 +31,7 @@ function formatDate(iso: string): string {
 interface SortableItemProps {
   item: AnyItem
   isSelected: boolean
+  isDraggable?: boolean
   onSelect: () => void
   onDelete: () => void
   onToggleCompleted?: (e: React.MouseEvent) => void
@@ -39,6 +40,7 @@ interface SortableItemProps {
 export function SortableItem({
   item,
   isSelected,
+  isDraggable = true,
   onSelect,
   onDelete,
   onToggleCompleted
@@ -66,15 +68,28 @@ export function SortableItem({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {/* Drag handle */}
-          <span
-            {...attributes}
-            {...listeners}
-            onClick={(e) => e.stopPropagation()}
-            className="flex-shrink-0 opacity-0 group-hover:opacity-40 hover:!opacity-70 text-ink-light cursor-grab active:cursor-grabbing transition-opacity"
-            title="Réorganiser"
-          >
-            <FontAwesomeIcon icon={faGripVertical} className="text-xs" />
-          </span>
+          {isDraggable ? (
+            <span
+              {...attributes}
+              {...listeners}
+              onClick={(e) => e.stopPropagation()}
+              className="flex-shrink-0 opacity-0 group-hover:opacity-40 hover:!opacity-70 text-ink-light cursor-grab active:cursor-grabbing transition-opacity"
+              title="Réorganiser"
+            >
+              <FontAwesomeIcon icon={faGripVertical} className="text-xs" />
+            </span>
+          ) : (
+            <span className="flex-shrink-0 w-3" />
+          )}
+
+          {/* Pin indicator */}
+          {item.pinned && (
+            <FontAwesomeIcon
+              icon={faThumbtack}
+              className="flex-shrink-0 text-amber-500 text-xs"
+              title="Épinglé"
+            />
+          )}
 
           {/* Checkbox pour todos */}
           {isTodo(item) && onToggleCompleted && (
@@ -116,7 +131,7 @@ export function SortableItem({
         </button>
       </div>
 
-      <div className="flex items-center gap-2 mt-1 pl-5">
+      <div className="flex items-center gap-2 mt-1 pl-5 flex-wrap">
         {isTodo(item) && (
           <span className="inline-flex items-center gap-1 text-xs font-ui text-ink-light">
             <span className={`w-1.5 h-1.5 rounded-full ${getPriorityColor(item.priority)}`} />
@@ -124,6 +139,14 @@ export function SortableItem({
           </span>
         )}
         <span className="text-xs text-ink-light font-ui">{formatDate(item.updated)}</span>
+        {item.tags.map((tag) => (
+          <span
+            key={tag}
+            className="text-xs font-ui px-1.5 py-0.5 bg-paper-border/70 text-ink rounded-full"
+          >
+            #{tag}
+          </span>
+        ))}
       </div>
     </li>
   )

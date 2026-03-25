@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, dialog, globalShortcut } from 'electron'
+import * as fs from 'fs'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import {
@@ -13,7 +14,9 @@ import {
   createTodo,
   updateTodo,
   deleteTodo,
-  reorderTodos
+  reorderTodos,
+  getNotePath,
+  getTodoPath
 } from './fileSystem'
 
 let mainWindow: BrowserWindow | null = null
@@ -96,32 +99,67 @@ function createTray(): void {
   })
 }
 
+function wrapHandler<T>(fn: () => T): T | { error: string } {
+  try {
+    return fn()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[IPC Error]', message)
+    return { error: message }
+  }
+}
+
 function registerIpcHandlers(): void {
   // Notes
-  ipcMain.handle('notes:list', () => listNotes())
-  ipcMain.handle('notes:get', (_event, id: string) => getNote(id))
+  ipcMain.handle('notes:list', () => wrapHandler(() => listNotes()))
+  ipcMain.handle('notes:get', (_event, id: string) => wrapHandler(() => getNote(id)))
   ipcMain.handle('notes:create', (_event, title: string, content: string) =>
-    createNote(title, content)
+    wrapHandler(() => createNote(title, content))
   )
   ipcMain.handle('notes:update', (_event, id: string, updates: Parameters<typeof updateNote>[1]) =>
-    updateNote(id, updates)
+    wrapHandler(() => updateNote(id, updates))
   )
-  ipcMain.handle('notes:delete', (_event, id: string) => deleteNote(id))
-  ipcMain.handle('notes:reorder', (_event, orderedIds: string[]) => reorderNotes(orderedIds))
+  ipcMain.handle('notes:delete', (_event, id: string) => wrapHandler(() => deleteNote(id)))
+  ipcMain.handle('notes:reorder', (_event, orderedIds: string[]) =>
+    wrapHandler(() => reorderNotes(orderedIds))
+  )
 
   // Todos
-  ipcMain.handle('todos:list', () => listTodos())
-  ipcMain.handle('todos:get', (_event, id: string) => getTodo(id))
+  ipcMain.handle('todos:list', () => wrapHandler(() => listTodos()))
+  ipcMain.handle('todos:get', (_event, id: string) => wrapHandler(() => getTodo(id)))
   ipcMain.handle(
     'todos:create',
     (_event, title: string, content: string, priority: 'haute' | 'normale' | 'basse') =>
-      createTodo(title, content, priority)
+      wrapHandler(() => createTodo(title, content, priority))
   )
   ipcMain.handle('todos:update', (_event, id: string, updates: Parameters<typeof updateTodo>[1]) =>
-    updateTodo(id, updates)
+    wrapHandler(() => updateTodo(id, updates))
   )
-  ipcMain.handle('todos:delete', (_event, id: string) => deleteTodo(id))
-  ipcMain.handle('todos:reorder', (_event, orderedIds: string[]) => reorderTodos(orderedIds))
+  ipcMain.handle('todos:delete', (_event, id: string) => wrapHandler(() => deleteTodo(id)))
+  ipcMain.handle('todos:reorder', (_event, orderedIds: string[]) =>
+    wrapHandler(() => reorderTodos(orderedIds))
+  )
+
+  // Export
+  ipcMain.handle('item:export', async (_event, type: 'notes' | 'todos', id: string) => {
+    try {
+      const item = type === 'notes' ? getNote(id) : getTodo(id)
+      if (!item) return { error: 'Introuvable' }
+      const sourcePath = type === 'notes' ? getNotePath(id) : getTodoPath(id)
+      const result = await dialog.showSaveDialog(mainWindow!, {
+        title: 'Exporter',
+        defaultPath: `${item.title || 'sans-titre'}.md`,
+        filters: [{ name: 'Markdown', extensions: ['md'] }]
+      })
+      if (!result.canceled && result.filePath) {
+        fs.copyFileSync(sourcePath, result.filePath)
+        return { success: true }
+      }
+      return { success: false }
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
 
   // Window controls
   ipcMain.handle('window:minimize', () => mainWindow?.minimize())
@@ -142,6 +180,16 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
+  // Global shortcut to show/focus the app from anywhere
+  globalShortcut.register('CommandOrControl+Shift+B', () => {
+    if (mainWindow?.isVisible()) {
+      mainWindow.focus()
+    } else {
+      mainWindow?.show()
+      mainWindow?.focus()
+    }
+  })
+
   registerIpcHandlers()
   createWindow()
   createTray()
@@ -149,6 +197,10 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
 })
 
 app.on('window-all-closed', () => {

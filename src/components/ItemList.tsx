@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -10,10 +10,14 @@ import {
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faNoteSticky, faListCheck } from '@fortawesome/free-solid-svg-icons'
-import { Note, Todo, ItemType, AnyItem } from '../types'
+import { Note, Todo, ItemType, AnyItem, isTodo } from '../types'
 import { SearchBar } from './SearchBar'
 import { DeleteModal } from './DeleteModal'
 import { SortableItem } from './SortableItem'
+
+type SortMode = 'manual' | 'date' | 'priority'
+
+const PRIORITY_ORDER = { haute: 0, normale: 1, basse: 2 }
 
 interface ItemListProps {
   type: ItemType
@@ -26,6 +30,8 @@ export function ItemList({ type, onSelectItem, onRefreshRef }: ItemListProps): J
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<AnyItem | null>(null)
+  const [sortMode, setSortMode] = useState<SortMode>('manual')
+  const [activeTag, setActiveTag] = useState<string | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -45,7 +51,7 @@ export function ItemList({ type, onSelectItem, onRefreshRef }: ItemListProps): J
     if (onRefreshRef) onRefreshRef(loadItems)
   }, [onRefreshRef, loadItems])
 
-  const handleCreate = async () => {
+  const handleCreate = useCallback(async () => {
     if (type === 'notes') {
       const note = (await window.electron.invoke('notes:create', 'Nouvelle note', '')) as Note
       await loadItems()
@@ -60,7 +66,7 @@ export function ItemList({ type, onSelectItem, onRefreshRef }: ItemListProps): J
       await loadItems()
       onSelectItem(todo)
     }
-  }
+  }, [type, loadItems, onSelectItem])
 
   const handleDelete = async () => {
     if (!deleteTarget) return
@@ -101,7 +107,7 @@ export function ItemList({ type, onSelectItem, onRefreshRef }: ItemListProps): J
         await handleCreate()
       }
     },
-    [selectedId, items]
+    [selectedId, items, handleCreate]
   )
 
   useEffect(() => {
@@ -109,11 +115,50 @@ export function ItemList({ type, onSelectItem, onRefreshRef }: ItemListProps): J
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
-  // En mode recherche, on affiche les résultats filtrés sans drag
+  // All unique tags across items
+  const allTags = useMemo(() => {
+    const set = new Set<string>()
+    for (const item of items) {
+      for (const tag of item.tags) set.add(tag)
+    }
+    return Array.from(set).sort()
+  }, [items])
+
+  // Reset active tag if it disappears from items
+  useEffect(() => {
+    if (activeTag && !allTags.includes(activeTag)) setActiveTag(null)
+  }, [allTags, activeTag])
+
   const isSearching = search.length > 0
-  const filtered = isSearching
-    ? items.filter((item) => item.title.toLowerCase().includes(search.toLowerCase()))
-    : items
+  const isDraggable = sortMode === 'manual' && !isSearching
+
+  const sortedItems = useMemo(() => {
+    if (sortMode === 'manual') return items
+    const copy = [...items]
+    if (sortMode === 'date') {
+      copy.sort((a, b) => {
+        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+        return new Date(b.updated).getTime() - new Date(a.updated).getTime()
+      })
+    } else if (sortMode === 'priority') {
+      copy.sort((a, b) => {
+        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+        const pa = isTodo(a) ? PRIORITY_ORDER[a.priority] : 1
+        const pb = isTodo(b) ? PRIORITY_ORDER[b.priority] : 1
+        return pa - pb
+      })
+    }
+    return copy
+  }, [items, sortMode])
+
+  const filtered = sortedItems.filter((item) => {
+    if (activeTag && !item.tags.includes(activeTag)) return false
+    if (isSearching) {
+      const q = search.toLowerCase()
+      return item.title.toLowerCase().includes(q) || item.content.toLowerCase().includes(q)
+    }
+    return true
+  })
 
   return (
     <div className="flex flex-col h-full">
@@ -122,18 +167,49 @@ export function ItemList({ type, onSelectItem, onRefreshRef }: ItemListProps): J
         <span className="text-xs font-semibold text-ink-light uppercase tracking-wider font-ui select-none">
           {type === 'notes' ? 'Notes' : 'Todos'}
         </span>
-        <button
-          onClick={handleCreate}
-          className="px-3 py-1.5 bg-ink text-paper-light text-xs font-ui font-medium rounded-lg hover:bg-ink-dark transition-colors no-drag"
-        >
-          + Ajouter
-        </button>
+        <div className="flex items-center gap-2 no-drag">
+          <select
+            value={sortMode}
+            onChange={(e) => setSortMode(e.target.value as SortMode)}
+            className="text-xs font-ui bg-transparent border border-paper-border rounded px-1.5 py-1 text-ink cursor-pointer"
+            title="Trier par"
+          >
+            <option value="manual">Manuel</option>
+            <option value="date">Date</option>
+            {type === 'todos' && <option value="priority">Priorité</option>}
+          </select>
+          <button
+            onClick={handleCreate}
+            className="px-3 py-1.5 bg-ink text-paper-light text-xs font-ui font-medium rounded-lg hover:bg-ink-dark transition-colors"
+          >
+            + Ajouter
+          </button>
+        </div>
       </div>
 
       {/* Search */}
       <div className="px-4 py-3 border-b border-paper-border">
         <SearchBar value={search} onChange={setSearch} />
       </div>
+
+      {/* Tag filter */}
+      {allTags.length > 0 && (
+        <div className="px-4 py-2 border-b border-paper-border flex flex-wrap gap-1">
+          {allTags.map((tag) => (
+            <button
+              key={tag}
+              onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+              className={`text-xs font-ui px-2 py-0.5 rounded-full transition-colors ${
+                activeTag === tag
+                  ? 'bg-ink text-paper-light'
+                  : 'bg-paper-border text-ink hover:bg-paper-border/70'
+              }`}
+            >
+              #{tag}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* List */}
       <div className="flex-1 overflow-y-auto">
@@ -144,16 +220,16 @@ export function ItemList({ type, onSelectItem, onRefreshRef }: ItemListProps): J
               className="text-4xl mb-3 opacity-40"
             />
             <p className="text-sm font-ui">
-              {isSearching ? 'Aucun résultat' : `Aucune ${type === 'notes' ? 'note' : 'todo'}`}
+              {isSearching || activeTag ? 'Aucun résultat' : `Aucune ${type === 'notes' ? 'note' : 'todo'}`}
             </p>
           </div>
-        ) : isSearching ? (
-          // Mode recherche : liste simple sans drag
+        ) : !isDraggable ? (
           <ul>
             {filtered.map((item) => (
               <SortableItem
                 key={item.id}
                 item={item}
+                isDraggable={false}
                 isSelected={selectedId === item.id}
                 onSelect={() => {
                   setSelectedId(item.id)
@@ -169,7 +245,6 @@ export function ItemList({ type, onSelectItem, onRefreshRef }: ItemListProps): J
             ))}
           </ul>
         ) : (
-          // Mode normal : liste avec drag & drop
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -177,10 +252,11 @@ export function ItemList({ type, onSelectItem, onRefreshRef }: ItemListProps): J
           >
             <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
               <ul>
-                {items.map((item) => (
+                {filtered.map((item) => (
                   <SortableItem
                     key={item.id}
                     item={item}
+                    isDraggable={true}
                     isSelected={selectedId === item.id}
                     onSelect={() => {
                       setSelectedId(item.id)

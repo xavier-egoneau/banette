@@ -6,6 +6,8 @@ export interface Note {
   created: string
   updated: string
   content: string
+  tags: string[]
+  pinned: boolean
 }
 
 export interface Todo {
@@ -16,6 +18,8 @@ export interface Todo {
   priority: Priority
   completed: boolean
   content: string
+  tags: string[]
+  pinned: boolean
 }
 
 export type ItemType = 'notes' | 'todos'

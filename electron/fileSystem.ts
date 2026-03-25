@@ -11,6 +11,8 @@ export interface NoteFile {
   updated: string
   order: number
   content: string
+  tags: string[]
+  pinned: boolean
 }
 
 export interface TodoFile {
@@ -22,6 +24,8 @@ export interface TodoFile {
   priority: 'haute' | 'normale' | 'basse'
   completed: boolean
   content: string
+  tags: string[]
+  pinned: boolean
 }
 
 function getBasePath(): string {
@@ -55,6 +59,27 @@ function writeMarkdownFile(filePath: string, data: Record<string, unknown>, cont
   fs.writeFileSync(filePath, fileContent, 'utf-8')
 }
 
+function parseTags(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.map(String).filter(Boolean)
+}
+
+function sortByPinnedThenOrder<T extends { pinned: boolean; order: number; updated: string }>(items: T[]): T[] {
+  return items.sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+    return a.order - b.order || new Date(b.updated).getTime() - new Date(a.updated).getTime()
+  })
+}
+
+// Path helpers for export
+export function getNotePath(id: string): string {
+  return path.join(getNotesDir(), `${id}.md`)
+}
+
+export function getTodoPath(id: string): string {
+  return path.join(getTodosDir(), `${id}.md`)
+}
+
 // Notes
 
 export function listNotes(): NoteFile[] {
@@ -62,8 +87,35 @@ export function listNotes(): NoteFile[] {
   const dir = getNotesDir()
   const files = fs.readdirSync(dir).filter((f) => f.endsWith('.md'))
 
-  const notes = files.map((file) => {
-    const filePath = path.join(dir, file)
+  const notes: NoteFile[] = []
+  for (const file of files) {
+    try {
+      const filePath = path.join(dir, file)
+      const parsed = readMarkdownFile(filePath)
+      const data = parsed.data as Record<string, unknown>
+      notes.push({
+        id: String(data.id ?? ''),
+        title: String(data.title ?? ''),
+        created: String(data.created ?? ''),
+        updated: String(data.updated ?? ''),
+        order: typeof data.order === 'number' ? data.order : Infinity,
+        content: parsed.content.trim(),
+        tags: parseTags(data.tags),
+        pinned: Boolean(data.pinned ?? false)
+      })
+    } catch {
+      // Skip corrupted files silently
+    }
+  }
+
+  return sortByPinnedThenOrder(notes)
+}
+
+export function getNote(id: string): NoteFile | null {
+  ensureDirectories()
+  const filePath = getNotePath(id)
+  if (!fs.existsSync(filePath)) return null
+  try {
     const parsed = readMarkdownFile(filePath)
     const data = parsed.data as Record<string, unknown>
     return {
@@ -72,27 +124,12 @@ export function listNotes(): NoteFile[] {
       created: String(data.created ?? ''),
       updated: String(data.updated ?? ''),
       order: typeof data.order === 'number' ? data.order : Infinity,
-      content: parsed.content.trim()
-    } as NoteFile
-  })
-
-  return notes.sort((a, b) => a.order - b.order || new Date(b.updated).getTime() - new Date(a.updated).getTime())
-}
-
-export function getNote(id: string): NoteFile | null {
-  ensureDirectories()
-  const dir = getNotesDir()
-  const filePath = path.join(dir, `${id}.md`)
-  if (!fs.existsSync(filePath)) return null
-  const parsed = readMarkdownFile(filePath)
-  const data = parsed.data as Record<string, unknown>
-  return {
-    id: String(data.id ?? ''),
-    title: String(data.title ?? ''),
-    created: String(data.created ?? ''),
-    updated: String(data.updated ?? ''),
-    order: typeof data.order === 'number' ? data.order : Infinity,
-    content: parsed.content.trim()
+      content: parsed.content.trim(),
+      tags: parseTags(data.tags),
+      pinned: Boolean(data.pinned ?? false)
+    }
+  } catch {
+    return null
   }
 }
 
@@ -101,9 +138,8 @@ export function createNote(title: string, content: string = ''): NoteFile {
   const id = uuidv4()
   const now = new Date().toISOString()
   const order = 0
-  const note: NoteFile = { id, title, created: now, updated: now, order, content }
-  const filePath = path.join(getNotesDir(), `${id}.md`)
-  writeMarkdownFile(filePath, { id, title, created: now, updated: now, order }, content)
+  const note: NoteFile = { id, title, created: now, updated: now, order, content, tags: [], pinned: false }
+  writeMarkdownFile(getNotePath(id), { id, title, created: now, updated: now, order, tags: [], pinned: false }, content)
   return note
 }
 
@@ -112,16 +148,18 @@ export function updateNote(id: string, updates: Partial<Omit<NoteFile, 'id' | 'c
   const existing = getNote(id)
   if (!existing) return null
   const now = new Date().toISOString()
-  const updated: NoteFile = {
-    ...existing,
-    ...updates,
-    id,
-    updated: now
-  }
-  const filePath = path.join(getNotesDir(), `${id}.md`)
+  const updated: NoteFile = { ...existing, ...updates, id, updated: now }
   writeMarkdownFile(
-    filePath,
-    { id, title: updated.title, created: updated.created, updated: now, order: updated.order },
+    getNotePath(id),
+    {
+      id,
+      title: updated.title,
+      created: updated.created,
+      updated: now,
+      order: updated.order,
+      tags: updated.tags,
+      pinned: updated.pinned
+    },
     updated.content
   )
   return updated
@@ -129,17 +167,21 @@ export function updateNote(id: string, updates: Partial<Omit<NoteFile, 'id' | 'c
 
 export function reorderNotes(orderedIds: string[]): void {
   ensureDirectories()
-  orderedIds.forEach((id, index) => {
-    const filePath = path.join(getNotesDir(), `${id}.md`)
-    if (!fs.existsSync(filePath)) return
-    const parsed = readMarkdownFile(filePath)
-    writeMarkdownFile(filePath, { ...parsed.data, order: index }, parsed.content)
-  })
+  for (const [index, id] of orderedIds.entries()) {
+    const filePath = getNotePath(id)
+    if (!fs.existsSync(filePath)) continue
+    try {
+      const parsed = readMarkdownFile(filePath)
+      writeMarkdownFile(filePath, { ...parsed.data, order: index }, parsed.content)
+    } catch {
+      // Skip files that can't be read/written
+    }
+  }
 }
 
 export function deleteNote(id: string): boolean {
   ensureDirectories()
-  const filePath = path.join(getNotesDir(), `${id}.md`)
+  const filePath = getNotePath(id)
   if (!fs.existsSync(filePath)) return false
   fs.unlinkSync(filePath)
   return true
@@ -152,8 +194,37 @@ export function listTodos(): TodoFile[] {
   const dir = getTodosDir()
   const files = fs.readdirSync(dir).filter((f) => f.endsWith('.md'))
 
-  const todos = files.map((file) => {
-    const filePath = path.join(dir, file)
+  const todos: TodoFile[] = []
+  for (const file of files) {
+    try {
+      const filePath = path.join(dir, file)
+      const parsed = readMarkdownFile(filePath)
+      const data = parsed.data as Record<string, unknown>
+      todos.push({
+        id: String(data.id ?? ''),
+        title: String(data.title ?? ''),
+        created: String(data.created ?? ''),
+        updated: String(data.updated ?? ''),
+        order: typeof data.order === 'number' ? data.order : Infinity,
+        priority: (data.priority as 'haute' | 'normale' | 'basse') ?? 'normale',
+        completed: Boolean(data.completed ?? false),
+        content: parsed.content.trim(),
+        tags: parseTags(data.tags),
+        pinned: Boolean(data.pinned ?? false)
+      })
+    } catch {
+      // Skip corrupted files silently
+    }
+  }
+
+  return sortByPinnedThenOrder(todos)
+}
+
+export function getTodo(id: string): TodoFile | null {
+  ensureDirectories()
+  const filePath = getTodoPath(id)
+  if (!fs.existsSync(filePath)) return null
+  try {
     const parsed = readMarkdownFile(filePath)
     const data = parsed.data as Record<string, unknown>
     return {
@@ -164,29 +235,12 @@ export function listTodos(): TodoFile[] {
       order: typeof data.order === 'number' ? data.order : Infinity,
       priority: (data.priority as 'haute' | 'normale' | 'basse') ?? 'normale',
       completed: Boolean(data.completed ?? false),
-      content: parsed.content.trim()
-    } as TodoFile
-  })
-
-  return todos.sort((a, b) => a.order - b.order || new Date(b.updated).getTime() - new Date(a.updated).getTime())
-}
-
-export function getTodo(id: string): TodoFile | null {
-  ensureDirectories()
-  const dir = getTodosDir()
-  const filePath = path.join(dir, `${id}.md`)
-  if (!fs.existsSync(filePath)) return null
-  const parsed = readMarkdownFile(filePath)
-  const data = parsed.data as Record<string, unknown>
-  return {
-    id: String(data.id ?? ''),
-    title: String(data.title ?? ''),
-    created: String(data.created ?? ''),
-    updated: String(data.updated ?? ''),
-    order: typeof data.order === 'number' ? data.order : Infinity,
-    priority: (data.priority as 'haute' | 'normale' | 'basse') ?? 'normale',
-    completed: Boolean(data.completed ?? false),
-    content: parsed.content.trim()
+      content: parsed.content.trim(),
+      tags: parseTags(data.tags),
+      pinned: Boolean(data.pinned ?? false)
+    }
+  } catch {
+    return null
   }
 }
 
@@ -199,11 +253,10 @@ export function createTodo(
   const id = uuidv4()
   const now = new Date().toISOString()
   const order = 0
-  const todo: TodoFile = { id, title, created: now, updated: now, order, priority, completed: false, content }
-  const filePath = path.join(getTodosDir(), `${id}.md`)
+  const todo: TodoFile = { id, title, created: now, updated: now, order, priority, completed: false, content, tags: [], pinned: false }
   writeMarkdownFile(
-    filePath,
-    { id, title, created: now, updated: now, order, priority, completed: false },
+    getTodoPath(id),
+    { id, title, created: now, updated: now, order, priority, completed: false, tags: [], pinned: false },
     content
   )
   return todo
@@ -217,15 +270,9 @@ export function updateTodo(
   const existing = getTodo(id)
   if (!existing) return null
   const now = new Date().toISOString()
-  const updated: TodoFile = {
-    ...existing,
-    ...updates,
-    id,
-    updated: now
-  }
-  const filePath = path.join(getTodosDir(), `${id}.md`)
+  const updated: TodoFile = { ...existing, ...updates, id, updated: now }
   writeMarkdownFile(
-    filePath,
+    getTodoPath(id),
     {
       id,
       title: updated.title,
@@ -233,7 +280,9 @@ export function updateTodo(
       updated: now,
       order: updated.order,
       priority: updated.priority,
-      completed: updated.completed
+      completed: updated.completed,
+      tags: updated.tags,
+      pinned: updated.pinned
     },
     updated.content
   )
@@ -242,17 +291,21 @@ export function updateTodo(
 
 export function reorderTodos(orderedIds: string[]): void {
   ensureDirectories()
-  orderedIds.forEach((id, index) => {
-    const filePath = path.join(getTodosDir(), `${id}.md`)
-    if (!fs.existsSync(filePath)) return
-    const parsed = readMarkdownFile(filePath)
-    writeMarkdownFile(filePath, { ...parsed.data, order: index }, parsed.content)
-  })
+  for (const [index, id] of orderedIds.entries()) {
+    const filePath = getTodoPath(id)
+    if (!fs.existsSync(filePath)) continue
+    try {
+      const parsed = readMarkdownFile(filePath)
+      writeMarkdownFile(filePath, { ...parsed.data, order: index }, parsed.content)
+    } catch {
+      // Skip files that can't be read/written
+    }
+  }
 }
 
 export function deleteTodo(id: string): boolean {
   ensureDirectories()
-  const filePath = path.join(getTodosDir(), `${id}.md`)
+  const filePath = getTodoPath(id)
   if (!fs.existsSync(filePath)) return false
   fs.unlinkSync(filePath)
   return true

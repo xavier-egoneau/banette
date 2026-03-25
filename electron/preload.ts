@@ -35,7 +35,8 @@ const electronAPI = {
       'todos:reorder',
       'window:minimize',
       'window:maximize',
-      'window:close'
+      'window:close',
+      'item:export'
     ]
     if (allowedChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)

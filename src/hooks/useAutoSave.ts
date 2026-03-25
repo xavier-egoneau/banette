@@ -1,11 +1,11 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 
 export function useAutoSave<T>(
   value: T,
   onSave: (value: T) => Promise<void>,
   delay: number = 800
 ): { isSaving: boolean } {
-  const isSavingRef = useRef(false)
+  const [isSaving, setIsSaving] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestValueRef = useRef(value)
   const isFirstRender = useRef(true)
@@ -15,11 +15,11 @@ export function useAutoSave<T>(
   }, [value])
 
   const save = useCallback(async () => {
-    isSavingRef.current = true
+    setIsSaving(true)
     try {
       await onSave(latestValueRef.current)
     } finally {
-      isSavingRef.current = false
+      setIsSaving(false)
     }
   }, [onSave])
 
@@ -44,5 +44,5 @@ export function useAutoSave<T>(
     }
   }, [value, delay, save])
 
-  return { isSaving: isSavingRef.current }
+  return { isSaving }
 }
