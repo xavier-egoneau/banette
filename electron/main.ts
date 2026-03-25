@@ -3,21 +3,11 @@ import * as fs from 'fs'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import {
-  listNotes,
-  getNote,
-  createNote,
-  updateNote,
-  deleteNote,
-  reorderNotes,
-  listTodos,
-  getTodo,
-  createTodo,
-  updateTodo,
-  deleteTodo,
-  reorderTodos,
-  getNotePath,
-  getTodoPath
+  listNotes, getNote, createNote, updateNote, deleteNote, reorderNotes,
+  listTodos, getTodo, createTodo, updateTodo, deleteTodo, reorderTodos,
+  getNotePath, getTodoPath, getCurrentStoragePath, importMarkdownFiles
 } from './fileSystem'
+import { getSettings, setSettings } from './settings'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -52,7 +42,6 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // Minimize to tray instead of closing
   mainWindow.on('close', (event) => {
     event.preventDefault()
     mainWindow?.hide()
@@ -72,18 +61,10 @@ function createTray(): void {
   const contextMenu = Menu.buildFromTemplate([
     {
       label: 'Ouvrir Banette',
-      click: () => {
-        mainWindow?.show()
-        mainWindow?.focus()
-      }
+      click: () => { mainWindow?.show(); mainWindow?.focus() }
     },
     { type: 'separator' },
-    {
-      label: 'Quitter',
-      click: () => {
-        app.exit(0)
-      }
-    }
+    { label: 'Quitter', click: () => { app.exit(0) } }
   ])
 
   tray.setToolTip('Banette')
@@ -112,36 +93,22 @@ function wrapHandler<T>(fn: () => T): T | { error: string } {
 function registerIpcHandlers(): void {
   // Notes
   ipcMain.handle('notes:list', () => wrapHandler(() => listNotes()))
-  ipcMain.handle('notes:get', (_event, id: string) => wrapHandler(() => getNote(id)))
-  ipcMain.handle('notes:create', (_event, title: string, content: string) =>
-    wrapHandler(() => createNote(title, content))
-  )
-  ipcMain.handle('notes:update', (_event, id: string, updates: Parameters<typeof updateNote>[1]) =>
-    wrapHandler(() => updateNote(id, updates))
-  )
-  ipcMain.handle('notes:delete', (_event, id: string) => wrapHandler(() => deleteNote(id)))
-  ipcMain.handle('notes:reorder', (_event, orderedIds: string[]) =>
-    wrapHandler(() => reorderNotes(orderedIds))
-  )
+  ipcMain.handle('notes:get', (_e, id: string) => wrapHandler(() => getNote(id)))
+  ipcMain.handle('notes:create', (_e, title: string, content: string) => wrapHandler(() => createNote(title, content)))
+  ipcMain.handle('notes:update', (_e, id: string, updates: Parameters<typeof updateNote>[1]) => wrapHandler(() => updateNote(id, updates)))
+  ipcMain.handle('notes:delete', (_e, id: string) => wrapHandler(() => deleteNote(id)))
+  ipcMain.handle('notes:reorder', (_e, ids: string[]) => wrapHandler(() => reorderNotes(ids)))
 
   // Todos
   ipcMain.handle('todos:list', () => wrapHandler(() => listTodos()))
-  ipcMain.handle('todos:get', (_event, id: string) => wrapHandler(() => getTodo(id)))
-  ipcMain.handle(
-    'todos:create',
-    (_event, title: string, content: string, priority: 'haute' | 'normale' | 'basse') =>
-      wrapHandler(() => createTodo(title, content, priority))
-  )
-  ipcMain.handle('todos:update', (_event, id: string, updates: Parameters<typeof updateTodo>[1]) =>
-    wrapHandler(() => updateTodo(id, updates))
-  )
-  ipcMain.handle('todos:delete', (_event, id: string) => wrapHandler(() => deleteTodo(id)))
-  ipcMain.handle('todos:reorder', (_event, orderedIds: string[]) =>
-    wrapHandler(() => reorderTodos(orderedIds))
-  )
+  ipcMain.handle('todos:get', (_e, id: string) => wrapHandler(() => getTodo(id)))
+  ipcMain.handle('todos:create', (_e, title: string, content: string, priority: 'haute' | 'normale' | 'basse') => wrapHandler(() => createTodo(title, content, priority)))
+  ipcMain.handle('todos:update', (_e, id: string, updates: Parameters<typeof updateTodo>[1]) => wrapHandler(() => updateTodo(id, updates)))
+  ipcMain.handle('todos:delete', (_e, id: string) => wrapHandler(() => deleteTodo(id)))
+  ipcMain.handle('todos:reorder', (_e, ids: string[]) => wrapHandler(() => reorderTodos(ids)))
 
   // Export
-  ipcMain.handle('item:export', async (_event, type: 'notes' | 'todos', id: string) => {
+  ipcMain.handle('item:export', async (_e, type: 'notes' | 'todos', id: string) => {
     try {
       const item = type === 'notes' ? getNote(id) : getTodo(id)
       if (!item) return { error: 'Introuvable' }
@@ -161,14 +128,46 @@ function registerIpcHandlers(): void {
     }
   })
 
+  // Import
+  ipcMain.handle('item:import', async () => {
+    try {
+      const result = await dialog.showOpenDialog(mainWindow!, {
+        title: 'Importer des fichiers Markdown',
+        properties: ['openFile', 'multiSelections'],
+        filters: [{ name: 'Markdown', extensions: ['md'] }]
+      })
+      if (result.canceled || result.filePaths.length === 0) return []
+      return importMarkdownFiles(result.filePaths)
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  // Settings
+  ipcMain.handle('settings:get', () => wrapHandler(() => ({
+    ...getSettings(),
+    storagePath: getCurrentStoragePath()
+  })))
+
+  ipcMain.handle('settings:set', (_e, updates: { darkMode?: boolean; storagePath?: string | null }) =>
+    wrapHandler(() => setSettings(updates))
+  )
+
+  // Folder chooser
+  ipcMain.handle('folder:choose', async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      title: 'Choisir le dossier de stockage',
+      properties: ['openDirectory', 'createDirectory']
+    })
+    if (result.canceled) return null
+    return result.filePaths[0]
+  })
+
   // Window controls
   ipcMain.handle('window:minimize', () => mainWindow?.minimize())
   ipcMain.handle('window:maximize', () => {
-    if (mainWindow?.isMaximized()) {
-      mainWindow.unmaximize()
-    } else {
-      mainWindow?.maximize()
-    }
+    if (mainWindow?.isMaximized()) mainWindow.unmaximize()
+    else mainWindow?.maximize()
   })
   ipcMain.handle('window:close', () => mainWindow?.hide())
 }
@@ -180,14 +179,9 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // Global shortcut to show/focus the app from anywhere
   globalShortcut.register('CommandOrControl+Shift+B', () => {
-    if (mainWindow?.isVisible()) {
-      mainWindow.focus()
-    } else {
-      mainWindow?.show()
-      mainWindow?.focus()
-    }
+    if (mainWindow?.isVisible()) mainWindow.focus()
+    else { mainWindow?.show(); mainWindow?.focus() }
   })
 
   registerIpcHandlers()
@@ -204,13 +198,11 @@ app.on('will-quit', () => {
 })
 
 app.on('window-all-closed', () => {
-  // On macOS, keep app running in tray
   if (process.platform !== 'darwin') {
-    // Do nothing - we manage this via tray
+    // Keep running in tray
   }
 })
 
-// Allow proper quit via tray menu
 app.on('before-quit', () => {
   mainWindow?.removeAllListeners('close')
 })

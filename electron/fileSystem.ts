@@ -3,6 +3,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import matter from 'gray-matter'
 import { v4 as uuidv4 } from 'uuid'
+import { getSettings } from './settings'
 
 export interface NoteFile {
   id: string
@@ -29,7 +30,8 @@ export interface TodoFile {
 }
 
 function getBasePath(): string {
-  return path.join(app.getPath('documents'), 'Banette')
+  const { storagePath } = getSettings()
+  return storagePath ?? path.join(app.getPath('documents'), 'Banette')
 }
 
 function getNotesDir(): string {
@@ -59,7 +61,7 @@ function writeMarkdownFile(filePath: string, data: Record<string, unknown>, cont
   fs.writeFileSync(filePath, fileContent, 'utf-8')
 }
 
-function parseTags(value: unknown): string[] {
+export function parseTags(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return value.map(String).filter(Boolean)
 }
@@ -78,6 +80,10 @@ export function getNotePath(id: string): string {
 
 export function getTodoPath(id: string): string {
   return path.join(getTodosDir(), `${id}.md`)
+}
+
+export function getCurrentStoragePath(): string {
+  return getBasePath()
 }
 
 // Notes
@@ -151,15 +157,7 @@ export function updateNote(id: string, updates: Partial<Omit<NoteFile, 'id' | 'c
   const updated: NoteFile = { ...existing, ...updates, id, updated: now }
   writeMarkdownFile(
     getNotePath(id),
-    {
-      id,
-      title: updated.title,
-      created: updated.created,
-      updated: now,
-      order: updated.order,
-      tags: updated.tags,
-      pinned: updated.pinned
-    },
+    { id, title: updated.title, created: updated.created, updated: now, order: updated.order, tags: updated.tags, pinned: updated.pinned },
     updated.content
   )
   return updated
@@ -174,7 +172,7 @@ export function reorderNotes(orderedIds: string[]): void {
       const parsed = readMarkdownFile(filePath)
       writeMarkdownFile(filePath, { ...parsed.data, order: index }, parsed.content)
     } catch {
-      // Skip files that can't be read/written
+      // Skip
     }
   }
 }
@@ -262,10 +260,7 @@ export function createTodo(
   return todo
 }
 
-export function updateTodo(
-  id: string,
-  updates: Partial<Omit<TodoFile, 'id' | 'created'>>
-): TodoFile | null {
+export function updateTodo(id: string, updates: Partial<Omit<TodoFile, 'id' | 'created'>>): TodoFile | null {
   ensureDirectories()
   const existing = getTodo(id)
   if (!existing) return null
@@ -274,15 +269,9 @@ export function updateTodo(
   writeMarkdownFile(
     getTodoPath(id),
     {
-      id,
-      title: updated.title,
-      created: updated.created,
-      updated: now,
-      order: updated.order,
-      priority: updated.priority,
-      completed: updated.completed,
-      tags: updated.tags,
-      pinned: updated.pinned
+      id, title: updated.title, created: updated.created, updated: now,
+      order: updated.order, priority: updated.priority, completed: updated.completed,
+      tags: updated.tags, pinned: updated.pinned
     },
     updated.content
   )
@@ -298,7 +287,7 @@ export function reorderTodos(orderedIds: string[]): void {
       const parsed = readMarkdownFile(filePath)
       writeMarkdownFile(filePath, { ...parsed.data, order: index }, parsed.content)
     } catch {
-      // Skip files that can't be read/written
+      // Skip
     }
   }
 }
@@ -309,4 +298,40 @@ export function deleteTodo(id: string): boolean {
   if (!fs.existsSync(filePath)) return false
   fs.unlinkSync(filePath)
   return true
+}
+
+// Import
+
+export function importMarkdownFiles(filePaths: string[]): (NoteFile | TodoFile)[] {
+  ensureDirectories()
+  const imported: (NoteFile | TodoFile)[] = []
+
+  for (const filePath of filePaths) {
+    try {
+      const raw = fs.readFileSync(filePath, 'utf-8')
+      const parsed = matter(raw)
+      const data = parsed.data as Record<string, unknown>
+      const title = String(data.title ?? path.basename(filePath, '.md'))
+      const content = parsed.content.trim()
+      const tags = parseTags(data.tags)
+      const hasTodoFields = 'priority' in data || 'completed' in data
+
+      if (hasTodoFields) {
+        const priority = (['haute', 'normale', 'basse'].includes(String(data.priority))
+          ? data.priority
+          : 'normale') as 'haute' | 'normale' | 'basse'
+        const todo = createTodo(title, content, priority)
+        updateTodo(todo.id, { tags, completed: Boolean(data.completed ?? false) })
+        imported.push({ ...todo, tags, completed: Boolean(data.completed ?? false) })
+      } else {
+        const note = createNote(title, content)
+        if (tags.length) updateNote(note.id, { tags })
+        imported.push({ ...note, tags })
+      }
+    } catch {
+      // Skip unparseable files
+    }
+  }
+
+  return imported
 }

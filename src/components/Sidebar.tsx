@@ -1,13 +1,16 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faNoteSticky, faListCheck } from '@fortawesome/free-solid-svg-icons'
+import { faNoteSticky, faListCheck, faMoon, faSun, faGear } from '@fortawesome/free-solid-svg-icons'
 import { ItemType } from '../types'
 
 interface SidebarProps {
   activeSection: ItemType
   onSectionChange: (section: ItemType) => void
+  darkMode: boolean
+  onToggleDarkMode: () => void
+  onOpenSettings: () => void
 }
 
-export function Sidebar({ activeSection, onSectionChange }: SidebarProps): JSX.Element {
+export function Sidebar({ activeSection, onSectionChange, darkMode, onToggleDarkMode, onOpenSettings }: SidebarProps): JSX.Element {
   return (
     <div className="sidebar flex flex-col w-40 min-w-[140px] bg-paper-dark border-r border-paper-border h-full">
       <div className="app-title px-4 py-4 drag-region">
@@ -42,8 +45,22 @@ export function Sidebar({ activeSection, onSectionChange }: SidebarProps): JSX.E
         </button>
       </nav>
 
-      <div className="px-4 py-3 text-xs text-ink-light font-ui opacity-60 select-none">
-        v1.0.0
+      <div className="px-2 py-3 flex items-center justify-between border-t border-paper-border">
+        <button
+          onClick={onToggleDarkMode}
+          className="p-2 rounded-lg text-ink-light hover:text-ink hover:bg-paper-line/50 transition-colors"
+          title={darkMode ? 'Mode clair' : 'Mode sombre'}
+        >
+          <FontAwesomeIcon icon={darkMode ? faSun : faMoon} className="text-sm" />
+        </button>
+        <button
+          onClick={onOpenSettings}
+          className="p-2 rounded-lg text-ink-light hover:text-ink hover:bg-paper-line/50 transition-colors"
+          title="Paramètres"
+        >
+          <FontAwesomeIcon icon={faGear} className="text-sm" />
+        </button>
+        <span className="text-xs text-ink-light font-ui opacity-60 select-none">v1.0</span>
       </div>
     </div>
   )

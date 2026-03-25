@@ -1,19 +1,20 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ['./src/**/*.{js,ts,jsx,tsx}'],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
         paper: {
-          light: '#FFF8E7',
-          dark: '#F5EDCC',
-          line: '#E8D9A0',
-          border: '#D4C078'
+          light: 'var(--color-paper-light)',
+          dark: 'var(--color-paper-dark)',
+          line: 'var(--color-paper-line)',
+          border: 'var(--color-paper-border)'
         },
         ink: {
-          light: '#8B7355',
-          DEFAULT: '#5C4A1E',
-          dark: '#3D2E0A'
+          light: 'var(--color-ink-light)',
+          DEFAULT: 'var(--color-ink)',
+          dark: 'var(--color-ink-dark)'
         }
       },
       fontFamily: {

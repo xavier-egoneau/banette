@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -9,7 +9,7 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faNoteSticky, faListCheck } from '@fortawesome/free-solid-svg-icons'
+import { faNoteSticky, faListCheck, faFileImport } from '@fortawesome/free-solid-svg-icons'
 import { Note, Todo, ItemType, AnyItem, isTodo } from '../types'
 import { SearchBar } from './SearchBar'
 import { DeleteModal } from './DeleteModal'
@@ -23,15 +23,18 @@ interface ItemListProps {
   type: ItemType
   onSelectItem: (item: AnyItem) => void
   onRefreshRef?: (fn: () => void) => void
+  onImported?: () => void
 }
 
-export function ItemList({ type, onSelectItem, onRefreshRef }: ItemListProps): JSX.Element {
+export function ItemList({ type, onSelectItem, onRefreshRef, onImported }: ItemListProps): JSX.Element {
   const [items, setItems] = useState<AnyItem[]>([])
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<AnyItem | null>(null)
   const [sortMode, setSortMode] = useState<SortMode>('manual')
   const [activeTag, setActiveTag] = useState<string | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
+  const importingRef = useRef(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -50,6 +53,20 @@ export function ItemList({ type, onSelectItem, onRefreshRef }: ItemListProps): J
   useEffect(() => {
     if (onRefreshRef) onRefreshRef(loadItems)
   }, [onRefreshRef, loadItems])
+
+  const handleImport = useCallback(async () => {
+    if (importingRef.current) return
+    importingRef.current = true
+    setIsImporting(true)
+    try {
+      await window.electron.invoke('item:import')
+      await loadItems()
+      onImported?.()
+    } finally {
+      importingRef.current = false
+      setIsImporting(false)
+    }
+  }, [loadItems, onImported])
 
   const handleCreate = useCallback(async () => {
     if (type === 'notes') {
@@ -178,6 +195,14 @@ export function ItemList({ type, onSelectItem, onRefreshRef }: ItemListProps): J
             <option value="date">Date</option>
             {type === 'todos' && <option value="priority">Priorité</option>}
           </select>
+          <button
+            onClick={handleImport}
+            disabled={isImporting}
+            className="p-1.5 text-ink-light hover:text-ink transition-colors disabled:opacity-40"
+            title="Importer des fichiers .md"
+          >
+            <FontAwesomeIcon icon={faFileImport} className="text-sm" />
+          </button>
           <button
             onClick={handleCreate}
             className="px-3 py-1.5 bg-ink text-paper-light text-xs font-ui font-medium rounded-lg hover:bg-ink-dark transition-colors"
