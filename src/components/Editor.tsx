@@ -1,9 +1,34 @@
 import { useEffect } from 'react'
-import { useEditor, EditorContent } from '@tiptap/react'
+import { useEditor, EditorContent, ReactNodeViewRenderer } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import { Markdown } from 'tiptap-markdown'
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
+import { createLowlight } from 'lowlight'
+import html from 'highlight.js/lib/languages/xml'
+import css from 'highlight.js/lib/languages/css'
+import javascript from 'highlight.js/lib/languages/javascript'
+import typescript from 'highlight.js/lib/languages/typescript'
+import json from 'highlight.js/lib/languages/json'
+import bash from 'highlight.js/lib/languages/bash'
+import python from 'highlight.js/lib/languages/python'
+import sql from 'highlight.js/lib/languages/sql'
+import markdown from 'highlight.js/lib/languages/markdown'
+import plaintext from 'highlight.js/lib/languages/plaintext'
+import { CodeBlockComponent } from './CodeBlockComponent'
+
+const lowlight = createLowlight()
+lowlight.register('html', html)
+lowlight.register('css', css)
+lowlight.register('javascript', javascript)
+lowlight.register('typescript', typescript)
+lowlight.register('json', json)
+lowlight.register('bash', bash)
+lowlight.register('python', python)
+lowlight.register('sql', sql)
+lowlight.register('markdown', markdown)
+lowlight.register('plaintext', plaintext)
 
 interface EditorProps {
   content: string
@@ -41,14 +66,16 @@ export function Editor({ content, onChange, editable = true }: EditorProps): JSX
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: {
-          levels: [1, 2, 3]
-        }
+        heading: { levels: [1, 2, 3] },
+        codeBlock: false
       }),
       TaskList,
-      TaskItem.configure({
-        nested: true
-      }),
+      TaskItem.configure({ nested: true }),
+      CodeBlockLowlight.extend({
+        addNodeView() {
+          return ReactNodeViewRenderer(CodeBlockComponent)
+        }
+      }).configure({ lowlight, defaultLanguage: 'plaintext' }),
       Markdown.configure({
         html: false,
         transformCopiedText: true
@@ -159,6 +186,14 @@ export function Editor({ content, onChange, editable = true }: EditorProps): JSX
             title="Citation"
           >
             ❝
+          </ToolbarButton>
+
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+            active={editor.isActive('codeBlock')}
+            title="Bloc de code"
+          >
+            {'</>'}
           </ToolbarButton>
 
           <ToolbarButton

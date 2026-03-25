@@ -26,11 +26,13 @@ const electronAPI = {
       'notes:create',
       'notes:update',
       'notes:delete',
+      'notes:reorder',
       'todos:list',
       'todos:get',
       'todos:create',
       'todos:update',
       'todos:delete',
+      'todos:reorder',
       'window:minimize',
       'window:maximize',
       'window:close'

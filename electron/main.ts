@@ -7,11 +7,13 @@ import {
   createNote,
   updateNote,
   deleteNote,
+  reorderNotes,
   listTodos,
   getTodo,
   createTodo,
   updateTodo,
-  deleteTodo
+  deleteTodo,
+  reorderTodos
 } from './fileSystem'
 
 let mainWindow: BrowserWindow | null = null
@@ -105,6 +107,7 @@ function registerIpcHandlers(): void {
     updateNote(id, updates)
   )
   ipcMain.handle('notes:delete', (_event, id: string) => deleteNote(id))
+  ipcMain.handle('notes:reorder', (_event, orderedIds: string[]) => reorderNotes(orderedIds))
 
   // Todos
   ipcMain.handle('todos:list', () => listTodos())
@@ -118,6 +121,7 @@ function registerIpcHandlers(): void {
     updateTodo(id, updates)
   )
   ipcMain.handle('todos:delete', (_event, id: string) => deleteTodo(id))
+  ipcMain.handle('todos:reorder', (_event, orderedIds: string[]) => reorderTodos(orderedIds))
 
   // Window controls
   ipcMain.handle('window:minimize', () => mainWindow?.minimize())

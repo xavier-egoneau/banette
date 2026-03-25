@@ -116,6 +116,97 @@
   font-size: 0.9em;
 }
 
+/* Code block with lowlight */
+.code-block-wrapper {
+  margin: 8px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #3e3e3e;
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  background: #2d2d2d;
+  padding: 4px 10px;
+  border-bottom: 1px solid #3e3e3e;
+}
+
+.code-lang-select {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #9e9e9e;
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.code-lang-select option {
+  background: #2d2d2d;
+  color: #d4d4d4;
+}
+
+.ProseMirror .code-block-wrapper pre {
+  background: #1e1e1e;
+  margin: 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  border-radius: 0;
+  border: none;
+}
+
+.ProseMirror .code-block-wrapper pre code {
+  background: none;
+  padding: 0;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #d4d4d4;
+}
+
+/* Coloration syntaxique — thème VS Code Dark */
+.hljs-comment,
+.hljs-quote { color: #6a9955; font-style: italic; }
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-name,
+.hljs-tag { color: #569cd6; }
+
+.hljs-string,
+.hljs-addition { color: #ce9178; }
+
+.hljs-title,
+.hljs-section,
+.hljs-type { color: #4ec9b0; }
+
+.hljs-attribute,
+.hljs-literal,
+.hljs-template-tag,
+.hljs-template-variable { color: #9cdcfe; }
+
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link { color: #b5cea8; }
+
+.hljs-deletion,
+.hljs-variable { color: #f44747; }
+
+.hljs-selector-class,
+.hljs-selector-id { color: #d7ba7d; }
+
+.hljs-function,
+.hljs-attr { color: #dcdcaa; }
+
+.hljs-meta { color: #9e9e9e; }
+
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: bold; }
+
 .ProseMirror pre {
   background: rgba(212, 192, 120, 0.2);
   border: 1px solid #D4C078;

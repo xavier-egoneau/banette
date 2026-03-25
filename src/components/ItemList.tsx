@@ -1,9 +1,19 @@
 import { useState, useEffect, useCallback } from 'react'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faNoteSticky, faListCheck, faTrash } from '@fortawesome/free-solid-svg-icons'
-import { Note, Todo, ItemType, AnyItem, isTodo, Priority } from '../types'
+import { faNoteSticky, faListCheck } from '@fortawesome/free-solid-svg-icons'
+import { Note, Todo, ItemType, AnyItem } from '../types'
 import { SearchBar } from './SearchBar'
 import { DeleteModal } from './DeleteModal'
+import { SortableItem } from './SortableItem'
 
 interface ItemListProps {
   type: ItemType
@@ -11,42 +21,15 @@ interface ItemListProps {
   onRefreshRef?: (fn: () => void) => void
 }
 
-function formatDate(iso: string): string {
-  const date = new Date(iso)
-  return date.toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  })
-}
-
-function getPriorityColor(priority: Priority): string {
-  switch (priority) {
-    case 'haute':
-      return 'bg-red-400'
-    case 'normale':
-      return 'bg-amber-400'
-    case 'basse':
-      return 'bg-green-400'
-  }
-}
-
-function getPriorityLabel(priority: Priority): string {
-  switch (priority) {
-    case 'haute':
-      return 'Haute'
-    case 'normale':
-      return 'Normale'
-    case 'basse':
-      return 'Basse'
-  }
-}
-
 export function ItemList({ type, onSelectItem, onRefreshRef }: ItemListProps): JSX.Element {
   const [items, setItems] = useState<AnyItem[]>([])
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<AnyItem | null>(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  )
 
   const loadItems = useCallback(async () => {
     const channel = type === 'notes' ? 'notes:list' : 'todos:list'
@@ -59,9 +42,7 @@ export function ItemList({ type, onSelectItem, onRefreshRef }: ItemListProps): J
   }, [loadItems])
 
   useEffect(() => {
-    if (onRefreshRef) {
-      onRefreshRef(loadItems)
-    }
+    if (onRefreshRef) onRefreshRef(loadItems)
   }, [onRefreshRef, loadItems])
 
   const handleCreate = async () => {
@@ -96,6 +77,19 @@ export function ItemList({ type, onSelectItem, onRefreshRef }: ItemListProps): J
     await loadItems()
   }
 
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = items.findIndex((i) => i.id === active.id)
+    const newIndex = items.findIndex((i) => i.id === over.id)
+    const reordered = arrayMove(items, oldIndex, newIndex)
+    setItems(reordered)
+
+    const channel = type === 'notes' ? 'notes:reorder' : 'todos:reorder'
+    await window.electron.invoke(channel, reordered.map((i) => i.id))
+  }
+
   const handleKeyDown = useCallback(
     async (e: KeyboardEvent) => {
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
@@ -115,9 +109,11 @@ export function ItemList({ type, onSelectItem, onRefreshRef }: ItemListProps): J
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
-  const filtered = items.filter((item) =>
-    item.title.toLowerCase().includes(search.toLowerCase())
-  )
+  // En mode recherche, on affiche les résultats filtrés sans drag
+  const isSearching = search.length > 0
+  const filtered = isSearching
+    ? items.filter((item) => item.title.toLowerCase().includes(search.toLowerCase()))
+    : items
 
   return (
     <div className="flex flex-col h-full">
@@ -143,85 +139,64 @@ export function ItemList({ type, onSelectItem, onRefreshRef }: ItemListProps): J
       <div className="flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full py-12 text-ink-light">
-            <FontAwesomeIcon icon={type === 'notes' ? faNoteSticky : faListCheck} className="text-4xl mb-3 opacity-40" />
+            <FontAwesomeIcon
+              icon={type === 'notes' ? faNoteSticky : faListCheck}
+              className="text-4xl mb-3 opacity-40"
+            />
             <p className="text-sm font-ui">
-              {search ? 'Aucun résultat' : `Aucune ${type === 'notes' ? 'note' : 'todo'}`}
+              {isSearching ? 'Aucun résultat' : `Aucune ${type === 'notes' ? 'note' : 'todo'}`}
             </p>
           </div>
-        ) : (
+        ) : isSearching ? (
+          // Mode recherche : liste simple sans drag
           <ul>
             {filtered.map((item) => (
-              <li
+              <SortableItem
                 key={item.id}
-                onClick={() => {
+                item={item}
+                isSelected={selectedId === item.id}
+                onSelect={() => {
                   setSelectedId(item.id)
                   onSelectItem(item)
                 }}
-                className={`group px-4 py-3 border-b border-paper-line/50 cursor-pointer transition-colors ${
-                  selectedId === item.id
-                    ? 'bg-paper-border/40'
-                    : 'hover:bg-paper-dark/60'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    {isTodo(item) && (
-                      <button
-                        onClick={(e) => handleToggleCompleted(e, item)}
-                        className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                          item.completed
-                            ? 'bg-amber-400 border-amber-400 text-white'
-                            : 'border-paper-border hover:border-ink-light'
-                        }`}
-                        title="Marquer comme complété"
-                      >
-                        {item.completed && (
-                          <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 12 12">
-                            <path d="M10 3L5 8.5 2 5.5l-1 1 4 4 6-7z" />
-                          </svg>
-                        )}
-                      </button>
-                    )}
-                    <span
-                      className={`text-sm font-ui font-medium truncate ${
-                        isTodo(item) && item.completed
-                          ? 'line-through text-ink-light'
-                          : 'text-ink-dark'
-                      }`}
-                    >
-                      {item.title}
-                    </span>
-                  </div>
-
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setDeleteTarget(item)
-                    }}
-                    className="flex-shrink-0 opacity-0 group-hover:opacity-100 text-ink-light hover:text-red-500 transition-all text-base p-0.5"
-                    title="Supprimer"
-                  >
-                    <FontAwesomeIcon icon={faTrash} className="text-xs" />
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-2 mt-1">
-                  {isTodo(item) && (
-                    <span
-                      className={`inline-flex items-center gap-1 text-xs font-ui text-ink-light`}
-                      title={`Priorité ${getPriorityLabel(item.priority)}`}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${getPriorityColor(item.priority)}`} />
-                      {getPriorityLabel(item.priority)}
-                    </span>
-                  )}
-                  <span className="text-xs text-ink-light font-ui">
-                    {formatDate(item.updated)}
-                  </span>
-                </div>
-              </li>
+                onDelete={() => setDeleteTarget(item)}
+                onToggleCompleted={
+                  type === 'todos'
+                    ? (e) => handleToggleCompleted(e, item as Todo)
+                    : undefined
+                }
+              />
             ))}
           </ul>
+        ) : (
+          // Mode normal : liste avec drag & drop
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+              <ul>
+                {items.map((item) => (
+                  <SortableItem
+                    key={item.id}
+                    item={item}
+                    isSelected={selectedId === item.id}
+                    onSelect={() => {
+                      setSelectedId(item.id)
+                      onSelectItem(item)
+                    }}
+                    onDelete={() => setDeleteTarget(item)}
+                    onToggleCompleted={
+                      type === 'todos'
+                        ? (e) => handleToggleCompleted(e, item as Todo)
+                        : undefined
+                    }
+                  />
+                ))}
+              </ul>
+            </SortableContext>
+          </DndContext>
         )}
       </div>
 

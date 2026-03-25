@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faTrash, faArrowLeft } from '@fortawesome/free-solid-svg-icons'
 import { Note, Todo, ItemType, isTodo, Priority } from '../types'
@@ -36,8 +36,9 @@ export function ItemDetail({ item, type, onBack, onDeleted, onSaved }: ItemDetai
   const [completed, setCompleted] = useState(isTodo(item) ? item.completed : false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
+  const titleRef = useRef<HTMLInputElement>(null)
 
-  // Reset state when item changes
+  // Reset state and focus title when item changes
   useEffect(() => {
     setTitle(item.title)
     setContent(item.content)
@@ -45,6 +46,11 @@ export function ItemDetail({ item, type, onBack, onDeleted, onSaved }: ItemDetai
       setPriority(item.priority)
       setCompleted(item.completed)
     }
+    // Focus + select all so the user can type the title directly
+    requestAnimationFrame(() => {
+      titleRef.current?.focus()
+      titleRef.current?.select()
+    })
   }, [item.id])
 
   const saveItem = useCallback(
@@ -114,6 +120,7 @@ export function ItemDetail({ item, type, onBack, onDeleted, onSaved }: ItemDetai
       {/* Title */}
       <div className="px-4 pt-4 pb-2 border-b border-paper-border">
         <input
+          ref={titleRef}
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}

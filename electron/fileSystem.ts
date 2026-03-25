@@ -9,6 +9,7 @@ export interface NoteFile {
   title: string
   created: string
   updated: string
+  order: number
   content: string
 }
 
@@ -17,6 +18,7 @@ export interface TodoFile {
   title: string
   created: string
   updated: string
+  order: number
   priority: 'haute' | 'normale' | 'basse'
   completed: boolean
   content: string
@@ -69,11 +71,12 @@ export function listNotes(): NoteFile[] {
       title: String(data.title ?? ''),
       created: String(data.created ?? ''),
       updated: String(data.updated ?? ''),
+      order: typeof data.order === 'number' ? data.order : Infinity,
       content: parsed.content.trim()
     } as NoteFile
   })
 
-  return notes.sort((a, b) => new Date(b.updated).getTime() - new Date(a.updated).getTime())
+  return notes.sort((a, b) => a.order - b.order || new Date(b.updated).getTime() - new Date(a.updated).getTime())
 }
 
 export function getNote(id: string): NoteFile | null {
@@ -88,6 +91,7 @@ export function getNote(id: string): NoteFile | null {
     title: String(data.title ?? ''),
     created: String(data.created ?? ''),
     updated: String(data.updated ?? ''),
+    order: typeof data.order === 'number' ? data.order : Infinity,
     content: parsed.content.trim()
   }
 }
@@ -96,9 +100,10 @@ export function createNote(title: string, content: string = ''): NoteFile {
   ensureDirectories()
   const id = uuidv4()
   const now = new Date().toISOString()
-  const note: NoteFile = { id, title, created: now, updated: now, content }
+  const order = 0
+  const note: NoteFile = { id, title, created: now, updated: now, order, content }
   const filePath = path.join(getNotesDir(), `${id}.md`)
-  writeMarkdownFile(filePath, { id, title, created: now, updated: now }, content)
+  writeMarkdownFile(filePath, { id, title, created: now, updated: now, order }, content)
   return note
 }
 
@@ -116,10 +121,20 @@ export function updateNote(id: string, updates: Partial<Omit<NoteFile, 'id' | 'c
   const filePath = path.join(getNotesDir(), `${id}.md`)
   writeMarkdownFile(
     filePath,
-    { id, title: updated.title, created: updated.created, updated: now },
+    { id, title: updated.title, created: updated.created, updated: now, order: updated.order },
     updated.content
   )
   return updated
+}
+
+export function reorderNotes(orderedIds: string[]): void {
+  ensureDirectories()
+  orderedIds.forEach((id, index) => {
+    const filePath = path.join(getNotesDir(), `${id}.md`)
+    if (!fs.existsSync(filePath)) return
+    const parsed = readMarkdownFile(filePath)
+    writeMarkdownFile(filePath, { ...parsed.data, order: index }, parsed.content)
+  })
 }
 
 export function deleteNote(id: string): boolean {
@@ -146,13 +161,14 @@ export function listTodos(): TodoFile[] {
       title: String(data.title ?? ''),
       created: String(data.created ?? ''),
       updated: String(data.updated ?? ''),
+      order: typeof data.order === 'number' ? data.order : Infinity,
       priority: (data.priority as 'haute' | 'normale' | 'basse') ?? 'normale',
       completed: Boolean(data.completed ?? false),
       content: parsed.content.trim()
     } as TodoFile
   })
 
-  return todos.sort((a, b) => new Date(b.updated).getTime() - new Date(a.updated).getTime())
+  return todos.sort((a, b) => a.order - b.order || new Date(b.updated).getTime() - new Date(a.updated).getTime())
 }
 
 export function getTodo(id: string): TodoFile | null {
@@ -167,6 +183,7 @@ export function getTodo(id: string): TodoFile | null {
     title: String(data.title ?? ''),
     created: String(data.created ?? ''),
     updated: String(data.updated ?? ''),
+    order: typeof data.order === 'number' ? data.order : Infinity,
     priority: (data.priority as 'haute' | 'normale' | 'basse') ?? 'normale',
     completed: Boolean(data.completed ?? false),
     content: parsed.content.trim()
@@ -181,11 +198,12 @@ export function createTodo(
   ensureDirectories()
   const id = uuidv4()
   const now = new Date().toISOString()
-  const todo: TodoFile = { id, title, created: now, updated: now, priority, completed: false, content }
+  const order = 0
+  const todo: TodoFile = { id, title, created: now, updated: now, order, priority, completed: false, content }
   const filePath = path.join(getTodosDir(), `${id}.md`)
   writeMarkdownFile(
     filePath,
-    { id, title, created: now, updated: now, priority, completed: false },
+    { id, title, created: now, updated: now, order, priority, completed: false },
     content
   )
   return todo
@@ -213,12 +231,23 @@ export function updateTodo(
       title: updated.title,
       created: updated.created,
       updated: now,
+      order: updated.order,
       priority: updated.priority,
       completed: updated.completed
     },
     updated.content
   )
   return updated
+}
+
+export function reorderTodos(orderedIds: string[]): void {
+  ensureDirectories()
+  orderedIds.forEach((id, index) => {
+    const filePath = path.join(getTodosDir(), `${id}.md`)
+    if (!fs.existsSync(filePath)) return
+    const parsed = readMarkdownFile(filePath)
+    writeMarkdownFile(filePath, { ...parsed.data, order: index }, parsed.content)
+  })
 }
 
 export function deleteTodo(id: string): boolean {
