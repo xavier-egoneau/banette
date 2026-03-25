@@ -6,15 +6,15 @@ module.exports = {
     extend: {
       colors: {
         paper: {
-          light: 'var(--color-paper-light)',
-          dark: 'var(--color-paper-dark)',
-          line: 'var(--color-paper-line)',
-          border: 'var(--color-paper-border)'
+          light:  'rgb(var(--color-paper-light)  / <alpha-value>)',
+          dark:   'rgb(var(--color-paper-dark)   / <alpha-value>)',
+          line:   'rgb(var(--color-paper-line)   / <alpha-value>)',
+          border: 'rgb(var(--color-paper-border) / <alpha-value>)'
         },
         ink: {
-          light: 'var(--color-ink-light)',
-          DEFAULT: 'var(--color-ink)',
-          dark: 'var(--color-ink-dark)'
+          light:   'rgb(var(--color-ink-light) / <alpha-value>)',
+          DEFAULT: 'rgb(var(--color-ink)       / <alpha-value>)',
+          dark:    'rgb(var(--color-ink-dark)  / <alpha-value>)'
         }
       },
       fontFamily: {

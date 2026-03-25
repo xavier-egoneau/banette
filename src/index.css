@@ -2,25 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── Color tokens ─────────────────────────────────────────────── */
+/* ─── Color tokens (RGB components for Tailwind opacity support) ── */
 :root {
-  --color-paper-light:  #FFF8E7;
-  --color-paper-dark:   #F5EDCC;
-  --color-paper-line:   #E8D9A0;
-  --color-paper-border: #D4C078;
-  --color-ink-light:    #8B7355;
-  --color-ink:          #5C4A1E;
-  --color-ink-dark:     #3D2E0A;
+  --color-paper-light:  255 248 231; /* #FFF8E7 */
+  --color-paper-dark:   245 237 204; /* #F5EDCC */
+  --color-paper-line:   232 217 160; /* #E8D9A0 */
+  --color-paper-border: 212 192 120; /* #D4C078 */
+  --color-ink-light:    139 115  85; /* #8B7355 */
+  --color-ink:           92  74  30; /* #5C4A1E */
+  --color-ink-dark:      61  46  10; /* #3D2E0A */
 }
 
 .dark {
-  --color-paper-light:  #1C1A13;
-  --color-paper-dark:   #242117;
-  --color-paper-line:   #2C2919;
-  --color-paper-border: #3D3820;
-  --color-ink-light:    #7A6E4E;
-  --color-ink:          #C4B07A;
-  --color-ink-dark:     #E8DCBA;
+  --color-paper-light:   28  26  19; /* #1C1A13 */
+  --color-paper-dark:    36  33  23; /* #242117 */
+  --color-paper-line:    44  41  25; /* #2C2919 */
+  --color-paper-border:  61  56  32; /* #3D3820 */
+  --color-ink-light:    122 110  78; /* #7A6E4E */
+  --color-ink:          196 176 122; /* #C4B07A */
+  --color-ink-dark:     232 220 186; /* #E8DCBA */
 }
 
 /* ─── Frameless window drag ─────────────────────────────────────── */
@@ -29,13 +29,13 @@
 
 /* ─── Paper lines effect ────────────────────────────────────────── */
 .editor-paper {
-  background-color: var(--color-paper-light);
+  background-color: rgb(var(--color-paper-light));
   background-image: repeating-linear-gradient(
     to bottom,
     transparent,
     transparent 27px,
-    var(--color-paper-line) 27px,
-    var(--color-paper-line) 28px
+    rgb(var(--color-paper-line) / 0.6) 27px,
+    rgb(var(--color-paper-line) / 0.6) 28px
   );
   background-size: 100% 28px;
   background-position: 0 16px;
@@ -50,7 +50,7 @@
   font-family: Georgia, serif;
   font-size: 15px;
   line-height: 28px;
-  color: var(--color-ink-dark);
+  color: rgb(var(--color-ink-dark));
 }
 
 .ProseMirror p {
@@ -62,7 +62,7 @@
 .ProseMirror h1 {
   font-size: 1.5em;
   font-weight: bold;
-  color: var(--color-ink-dark);
+  color: rgb(var(--color-ink-dark));
   margin: 8px 0 4px;
   line-height: 1.4;
 }
@@ -70,7 +70,7 @@
 .ProseMirror h2 {
   font-size: 1.25em;
   font-weight: bold;
-  color: var(--color-ink);
+  color: rgb(var(--color-ink));
   margin: 8px 0 4px;
   line-height: 1.4;
 }
@@ -78,13 +78,13 @@
 .ProseMirror h3 {
   font-size: 1.1em;
   font-weight: bold;
-  color: var(--color-ink);
+  color: rgb(var(--color-ink));
   margin: 4px 0 2px;
 }
 
 .ProseMirror strong {
   font-weight: bold;
-  color: var(--color-ink-dark);
+  color: rgb(var(--color-ink-dark));
 }
 
 .ProseMirror em { font-style: italic; }
@@ -95,10 +95,10 @@
 }
 
 .ProseMirror blockquote {
-  border-left: 3px solid var(--color-paper-border);
+  border-left: 3px solid rgb(var(--color-paper-border));
   padding-left: 12px;
   margin-left: 0;
-  color: var(--color-ink-light);
+  color: rgb(var(--color-ink-light));
   font-style: italic;
 }
 
@@ -116,13 +116,13 @@
 
 .ProseMirror hr {
   border: none;
-  border-top: 1px solid var(--color-paper-border);
+  border-top: 1px solid rgb(var(--color-paper-border));
   margin: 8px 0;
 }
 
 .ProseMirror code {
   font-family: 'Courier New', monospace;
-  background: color-mix(in srgb, var(--color-paper-border) 30%, transparent);
+  background: rgb(var(--color-paper-border) / 0.3);
   padding: 1px 4px;
   border-radius: 3px;
   font-size: 0.9em;
@@ -200,8 +200,8 @@
 .hljs-strong                        { font-weight: bold; }
 
 .ProseMirror pre {
-  background: color-mix(in srgb, var(--color-paper-border) 20%, transparent);
-  border: 1px solid var(--color-paper-border);
+  background: rgb(var(--color-paper-border) / 0.2);
+  border: 1px solid rgb(var(--color-paper-border));
   border-radius: 6px;
   padding: 12px;
   overflow-x: auto;
@@ -231,7 +231,7 @@
   width: 16px;
   height: 16px;
   cursor: pointer;
-  accent-color: var(--color-paper-border);
+  accent-color: rgb(var(--color-paper-border));
   border-radius: 3px;
 }
 
@@ -245,7 +245,7 @@
 /* ─── Placeholder ───────────────────────────────────────────────── */
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
-  color: var(--color-ink-light);
+  color: rgb(var(--color-ink-light));
   float: left;
   height: 0;
   pointer-events: none;
@@ -256,10 +256,10 @@
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-paper-border);
+  background: rgb(var(--color-paper-border));
   border-radius: 3px;
 }
-::-webkit-scrollbar-thumb:hover { background: var(--color-ink-light); }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--color-ink-light)); }
 
 /* ─── Base ──────────────────────────────────────────────────────── */
 * { box-sizing: border-box; }
@@ -268,7 +268,7 @@ body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background: var(--color-paper-light);
+  background: rgb(var(--color-paper-light));
 }
 
 #root {
