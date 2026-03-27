@@ -169,8 +169,12 @@ function registerIpcHandlers(): void {
   // Window controls
   ipcMain.handle('window:minimize', () => mainWindow?.minimize())
   ipcMain.handle('window:maximize', () => {
-    if (mainWindow?.isMaximized()) mainWindow.unmaximize()
-    else mainWindow?.maximize()
+    if (process.platform === 'darwin') {
+      mainWindow?.setFullScreen(!mainWindow.isFullScreen())
+    } else {
+      if (mainWindow?.isMaximized()) mainWindow.unmaximize()
+      else mainWindow?.maximize()
+    }
   })
   ipcMain.handle('window:close', () => mainWindow?.hide())
 }
