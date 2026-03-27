@@ -296,7 +296,46 @@ Un serveur MCP local est fourni pour permettre à un client compatible MCP de pi
 - `update_todo`
 - `delete_todo`
 
-### Exemple de configuration MCP
+### Intégration Claude Code / Cowork (via plugin)
+
+Le fichier `banette.plugin` embarque un `.mcp.json` qui enregistre automatiquement le serveur MCP auprès de Claude Code :
+
+```json
+{
+  "mcpServers": {
+    "banette": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/banette-mcp.js"],
+      "env": {
+        "BANETTE_API_BASE_URL": "http://127.0.0.1:3210"
+      }
+    }
+  }
+}
+```
+
+`${CLAUDE_PLUGIN_ROOT}` est une variable résolue par Claude Code au moment du chargement du plugin — elle pointe vers le dossier d’installation du plugin.
+
+**Prérequis pour que ça fonctionne :**
+
+1. Le plugin `banette.plugin` doit être installé dans Claude Code
+2. Banette (app packagée ou `npm run dev`) doit être **ouverte** — le MCP s’y connecte via l’API HTTP locale, il ne peut pas la lancer tout seul dans ce mode
+3. Claude Code doit être redémarré après installation du plugin pour que les outils MCP soient chargés
+
+> ⚠️ Lancer `npm run mcp` manuellement ne sert à rien dans ce contexte : le serveur MCP fonctionne en `stdio` et doit être démarré par Claude Code comme process enfant, pas en standalone.
+
+**Vérifier que l’API est bien démarrée :**
+
+```bash
+curl http://127.0.0.1:3210/api/health
+```
+
+Doit retourner `{"data":{"status":"ok",...}}`. Si ce n’est pas le cas, l’app Banette n’est pas ouverte ou a planté au démarrage.
+
+### Intégration Claude Code (sans plugin, via `.mcp.json` projet)
+
+Pour brancher Banette dans un projet Claude Code, ajouter dans `.mcp.json` à la racine du projet :
 
 ```json
 {
@@ -345,3 +384,45 @@ Exemple de config MCP avec lancement explicite :
   }
 }
 ```
+
+### Fallback : écriture directe dans les fichiers
+
+Si le MCP n’est pas disponible (outils non chargés dans la session courante), il est possible d’interagir directement avec les fichiers de stockage — le format est du Markdown standard avec frontmatter YAML.
+
+Le chemin de stockage est retourné par `/api/health` (`storagePath`), par défaut `~/Documents/Banette/`.
+
+**Format d’un fichier todo :**
+
+```markdown
+---
+id: <uuid-v4>
+title: Titre de la todo
+created: ‘2026-03-27T00:00:00.000Z’
+updated: ‘2026-03-27T00:00:00.000Z’
+order: 0
+priority: normale
+completed: false
+tags: []
+pinned: false
+---
+
+Contenu optionnel en Markdown.
+```
+
+**Format d’un fichier note :**
+
+```markdown
+---
+id: <uuid-v4>
+title: Titre de la note
+created: ‘2026-03-27T00:00:00.000Z’
+updated: ‘2026-03-27T00:00:00.000Z’
+order: 0
+tags: []
+pinned: false
+---
+
+Contenu en **Markdown**.
+```
+
+Chaque fichier est nommé `<uuid>.md` et placé dans `todos/` ou `notes/`. Banette surveille le dossier et recharge automatiquement les fichiers modifiés.
