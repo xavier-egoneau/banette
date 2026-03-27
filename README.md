@@ -30,6 +30,7 @@ Application de bureau pour gérer des **notes** et des **todos**, avec un édite
 ### Stockage
 - Fichiers locaux dans `Documents/Banette/` — aucune donnée envoyée sur internet
 - Format : Markdown avec frontmatter YAML
+- API HTTP locale en lecture/écriture sur `127.0.0.1:3210` pour automatisation par une IA ou des scripts
 
 ```markdown
 ---
@@ -60,6 +61,7 @@ Contenu de la note en **Markdown**.
 | Icônes | FontAwesome 6 |
 | Parsing Markdown | gray-matter |
 | IPC | contextBridge Electron |
+| API locale | HTTP Node.js sur `127.0.0.1` |
 
 ---
 
@@ -86,6 +88,9 @@ npm run dev
 
 Lance l'application Electron avec hot-reload via electron-vite.
 
+L’API locale démarre automatiquement avec l’application sur `http://127.0.0.1:3210`.
+Le port peut être surchargé via la variable d’environnement `BANETTE_API_PORT`.
+
 ### Build de production
 
 ```bash
@@ -93,6 +98,14 @@ npm run build
 ```
 
 Compile les sources dans `out/`.
+
+### Lancer le serveur MCP
+
+```bash
+npm run mcp
+```
+
+Ce serveur MCP fonctionne en `stdio` et est destiné à être lancé par un client compatible MCP, pas à rester exposé sur un port.
 
 ### Packager l'installateur
 
@@ -151,3 +164,184 @@ Documents/Banette/
 ```
 
 Fichiers Markdown standard, lisibles et modifiables avec n'importe quel éditeur de texte.
+
+---
+
+## API locale
+
+L’application expose une API HTTP locale pensée pour l’automatisation. Elle est accessible uniquement en local sur `127.0.0.1`.
+
+### Santé et infos
+
+- `GET /api/health`
+- `GET /api/info`
+
+Exemple :
+
+```bash
+curl http://127.0.0.1:3210/api/health
+```
+
+### Notes
+
+- `GET /api/notes`
+- `POST /api/notes`
+- `GET /api/notes/:id`
+- `PATCH /api/notes/:id`
+- `DELETE /api/notes/:id`
+
+Créer une note :
+
+```bash
+curl -X POST http://127.0.0.1:3210/api/notes \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Idées sprint",
+    "content": "- préparer la démo",
+    "tags": ["travail", "sprint"],
+    "pinned": true
+  }'
+```
+
+Modifier une note :
+
+```bash
+curl -X PATCH http://127.0.0.1:3210/api/notes/<id> \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Idées sprint v2",
+    "content": "- préparer la démo\n- écrire le changelog"
+  }'
+```
+
+### Todos
+
+- `GET /api/todos`
+- `POST /api/todos`
+- `GET /api/todos/:id`
+- `PATCH /api/todos/:id`
+- `DELETE /api/todos/:id`
+
+Créer une todo :
+
+```bash
+curl -X POST http://127.0.0.1:3210/api/todos \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Finaliser la release",
+    "content": "Vérifier la checklist",
+    "priority": "haute",
+    "completed": false,
+    "tags": ["release"]
+  }'
+```
+
+Modifier une todo :
+
+```bash
+curl -X PATCH http://127.0.0.1:3210/api/todos/<id> \
+  -H "Content-Type: application/json" \
+  -d '{
+    "completed": true,
+    "priority": "basse"
+  }'
+```
+
+### Formats JSON
+
+Les réponses de lecture utilisent le format :
+
+```json
+{
+  "data": {}
+}
+```
+
+Les erreurs utilisent le format :
+
+```json
+{
+  "error": "Message"
+}
+```
+
+### Champs acceptés
+
+- Note : `title`, `content`, `tags`, `pinned`
+- Todo : `title`, `content`, `priority`, `completed`, `tags`, `pinned`
+- Priorités valides : `haute`, `normale`, `basse`
+
+---
+
+## MCP local
+
+Un serveur MCP local est fourni pour permettre à un client compatible MCP de piloter Banette sans accès direct au système de fichiers.
+
+### Outil fourni
+
+- Commande : `npm run mcp`
+- Mode : `stdio`
+- Dépendance : nécessite que Banette soit ouverte pour que l’API locale `http://127.0.0.1:3210` réponde
+
+### Outils MCP exposés
+
+- `banette_health`
+- `banette_ensure_ready`
+- `list_notes`
+- `create_note`
+- `update_note`
+- `delete_note`
+- `list_todos`
+- `create_todo`
+- `update_todo`
+- `delete_todo`
+
+### Exemple de configuration MCP
+
+```json
+{
+  "mcpServers": {
+    "banette": {
+      "command": "npm",
+      "args": ["run", "mcp"],
+      "cwd": "/Users/xavieregoneau/projets/banette"
+    }
+  }
+}
+```
+
+Si tu utilises un autre port pour l’API Banette, ajoute `BANETTE_API_BASE_URL` côté client MCP.
+
+### Lancement automatique de l’app
+
+Le serveur MCP peut tenter de lancer Banette si l’API locale ne répond pas encore.
+
+Ordre de tentative :
+
+- `BANETTE_LAUNCH_COMMAND` si fourni
+- `open -a Banette` sur macOS
+- `dist/mac/Banette.app` si présent dans le repo
+- `npm run dev` comme fallback depuis le repo
+
+Variables utiles :
+
+- `BANETTE_API_BASE_URL`
+- `BANETTE_LAUNCH_COMMAND`
+- `BANETTE_APP_CWD`
+
+Exemple de config MCP avec lancement explicite :
+
+```json
+{
+  "mcpServers": {
+    "banette": {
+      "command": "npm",
+      "args": ["run", "mcp"],
+      "cwd": "/Users/xavieregoneau/projets/banette",
+      "env": {
+        "BANETTE_LAUNCH_COMMAND": "open -a Banette"
+      }
+    }
+  }
+}
+```

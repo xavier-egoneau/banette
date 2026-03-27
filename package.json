@@ -8,6 +8,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
+    "mcp": "node scripts/banette-mcp.js",
     "build:icon": "node scripts/build-icon.js",
     "package": "electron-vite build && electron-builder",
     "postinstall": "electron-builder install-app-deps"

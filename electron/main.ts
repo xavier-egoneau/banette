@@ -8,6 +8,7 @@ import {
   getNotePath, getTodoPath, getCurrentStoragePath, importMarkdownFiles
 } from './fileSystem'
 import { getSettings, setSettings } from './settings'
+import { getApiInfo, startApiServer, stopApiServer } from './apiServer'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -153,6 +154,8 @@ function registerIpcHandlers(): void {
     wrapHandler(() => setSettings(updates))
   )
 
+  ipcMain.handle('api:get-info', () => wrapHandler(() => getApiInfo()))
+
   // Folder chooser
   ipcMain.handle('folder:choose', async () => {
     const result = await dialog.showOpenDialog(mainWindow!, {
@@ -184,6 +187,14 @@ app.whenReady().then(() => {
     else { mainWindow?.show(); mainWindow?.focus() }
   })
 
+  void startApiServer()
+    .then((info) => {
+      console.log(`[Banette API] listening on ${info.baseUrl}`)
+    })
+    .catch((error) => {
+      console.error('[Banette API] failed to start', error)
+    })
+
   registerIpcHandlers()
   createWindow()
   createTray()
@@ -195,6 +206,9 @@ app.whenReady().then(() => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll()
+  void stopApiServer().catch((error) => {
+    console.error('[Banette API] failed to stop cleanly', error)
+  })
 })
 
 app.on('window-all-closed', () => {

@@ -8,7 +8,8 @@ const electronAPI = {
       'window:minimize', 'window:maximize', 'window:close',
       'item:export', 'item:import',
       'settings:get', 'settings:set',
-      'folder:choose'
+      'folder:choose',
+      'api:get-info'
     ]
     if (allowedChannels.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)
