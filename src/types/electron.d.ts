@@ -6,6 +6,8 @@ export interface BanetteApiInfo {
   port: number
   baseUrl: string
   storagePath: string
+  preferredPort: number
+  usingFallbackPort: boolean
 }
 
 declare global {

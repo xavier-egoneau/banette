@@ -8,10 +8,16 @@ import {
   getNotePath, getTodoPath, getCurrentStoragePath, importMarkdownFiles
 } from './fileSystem'
 import { getSettings, setSettings } from './settings'
-import { getApiInfo, startApiServer, stopApiServer } from './apiServer'
+import { getApiInfo, startApiServer, stopApiServer, restartApiServer } from './apiServer'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
+
+function showMainWindow(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (!mainWindow.isVisible()) mainWindow.show()
+  mainWindow.focus()
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -35,7 +41,19 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow?.show()
+    showMainWindow()
+  })
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    showMainWindow()
+  })
+
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error('[Banette Window] renderer process gone', details)
+  })
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    console.error('[Banette Window] failed to load', { errorCode, errorDescription, validatedURL })
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -43,9 +61,8 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  mainWindow.on('close', (event) => {
-    event.preventDefault()
-    mainWindow?.hide()
+  mainWindow.on('close', () => {
+    mainWindow = null
   })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -53,6 +70,10 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  setTimeout(() => {
+    showMainWindow()
+  }, 1500)
 }
 
 function createTray(): void {
@@ -62,7 +83,7 @@ function createTray(): void {
   const contextMenu = Menu.buildFromTemplate([
     {
       label: 'Ouvrir Banette',
-      click: () => { mainWindow?.show(); mainWindow?.focus() }
+      click: () => { showMainWindow() }
     },
     { type: 'separator' },
     { label: 'Quitter', click: () => { app.exit(0) } }
@@ -75,8 +96,7 @@ function createTray(): void {
     if (mainWindow?.isVisible()) {
       mainWindow.hide()
     } else {
-      mainWindow?.show()
-      mainWindow?.focus()
+      showMainWindow()
     }
   })
 }
@@ -150,9 +170,23 @@ function registerIpcHandlers(): void {
     storagePath: getCurrentStoragePath()
   })))
 
-  ipcMain.handle('settings:set', (_e, updates: { darkMode?: boolean; storagePath?: string | null }) =>
-    wrapHandler(() => setSettings(updates))
-  )
+  ipcMain.handle('settings:set', async (_e, updates: { darkMode?: boolean; storagePath?: string | null; apiPort?: number | null }) => {
+    try {
+      const previous = getSettings()
+      const next = setSettings(updates)
+
+      if (updates.apiPort !== undefined && updates.apiPort !== previous.apiPort) {
+        const api = await restartApiServer()
+        return { ...next, api }
+      }
+
+      return next
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      console.error('[IPC Error]', message)
+      return { error: message }
+    }
+  })
 
   ipcMain.handle('api:get-info', () => wrapHandler(() => getApiInfo()))
 
@@ -176,7 +210,9 @@ function registerIpcHandlers(): void {
       else mainWindow?.maximize()
     }
   })
-  ipcMain.handle('window:close', () => mainWindow?.hide())
+  ipcMain.handle('window:close', () => {
+    mainWindow?.close()
+  })
 }
 
 app.whenReady().then(() => {
@@ -187,13 +223,13 @@ app.whenReady().then(() => {
   })
 
   globalShortcut.register('CommandOrControl+Shift+B', () => {
-    if (mainWindow?.isVisible()) mainWindow.focus()
-    else { mainWindow?.show(); mainWindow?.focus() }
+    showMainWindow()
   })
 
   void startApiServer()
     .then((info) => {
-      console.log(`[Banette API] listening on ${info.baseUrl}`)
+      const suffix = info.usingFallbackPort ? ` (fallback from ${info.preferredPort})` : ''
+      console.log(`[Banette API] listening on ${info.baseUrl}${suffix}`)
     })
     .catch((error) => {
       console.error('[Banette API] failed to start', error)
@@ -217,7 +253,7 @@ app.on('will-quit', () => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
-    // Keep running in tray
+    app.quit()
   }
 })
 

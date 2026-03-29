@@ -5,11 +5,13 @@ import * as path from 'path'
 export interface Settings {
   darkMode: boolean
   storagePath: string | null
+  apiPort: number | null
 }
 
 const DEFAULT_SETTINGS: Settings = {
   darkMode: false,
-  storagePath: null
+  storagePath: null,
+  apiPort: null
 }
 
 function getSettingsPath(): string {

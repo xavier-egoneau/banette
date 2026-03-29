@@ -30,7 +30,7 @@ Application de bureau pour gérer des **notes** et des **todos**, avec un édite
 ### Stockage
 - Fichiers locaux dans `Documents/Banette/` — aucune donnée envoyée sur internet
 - Format : Markdown avec frontmatter YAML
-- API HTTP locale en lecture/écriture sur `127.0.0.1:3210` pour automatisation par une IA ou des scripts
+- API HTTP locale en lecture/écriture sur `127.0.0.1` pour automatisation par une IA ou des scripts, configurable dans l'app
 
 ```markdown
 ---
@@ -88,8 +88,9 @@ npm run dev
 
 Lance l'application Electron avec hot-reload via electron-vite.
 
-L’API locale démarre automatiquement avec l’application sur `http://127.0.0.1:3210`.
-Le port peut être surchargé via la variable d’environnement `BANETTE_API_PORT`.
+L’API locale démarre automatiquement avec l’application sur `http://127.0.0.1:3210` par défaut.
+Le port préféré peut être configuré dans les paramètres de l’application, ou surchargé via la variable d’environnement `BANETTE_API_PORT`.
+Si le port demandé est déjà occupé, Banette bascule automatiquement sur le prochain port libre.
 
 ### Build de production
 
@@ -114,6 +115,17 @@ npm run package
 ```
 
 Génère un installateur dans `dist/`.
+
+### Installer localement sous Linux
+
+Après génération de l'AppImage, tu peux intégrer Banette au menu d'applications avec :
+
+```bash
+chmod +x scripts/install-linux-appimage.sh
+./scripts/install-linux-appimage.sh
+```
+
+Le script copie l'AppImage dans `~/.local/bin`, installe l'icône dans `~/.local/share/icons` et crée un fichier `.desktop` dans `~/.local/share/applications`.
 
 ---
 

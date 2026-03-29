@@ -18,7 +18,7 @@ export function App(): JSX.Element {
   // Load settings on startup
   useEffect(() => {
     window.electron.invoke('settings:get').then((s) => {
-      const settings = s as { darkMode: boolean; storagePath: string }
+      const settings = s as { darkMode: boolean; storagePath: string; apiPort: number | null }
       if (settings.darkMode) {
         setDarkMode(true)
         document.documentElement.classList.add('dark')

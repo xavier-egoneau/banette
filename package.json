@@ -6,6 +6,7 @@
   "author": "Banette",
   "scripts": {
     "dev": "electron-vite dev",
+    "dev:3211": "BANETTE_API_PORT=3211 electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "mcp": "node scripts/banette-mcp.js",

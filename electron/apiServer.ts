@@ -15,6 +15,7 @@ import {
   updateNote,
   updateTodo
 } from './fileSystem'
+import { getSettings } from './settings'
 
 type Priority = 'haute' | 'normale' | 'basse'
 
@@ -24,6 +25,8 @@ interface ApiInfo {
   port: number
   baseUrl: string
   storagePath: string
+  preferredPort: number
+  usingFallbackPort: boolean
 }
 
 const API_HOST = '127.0.0.1'
@@ -33,6 +36,12 @@ const VALID_PRIORITIES: Priority[] = ['haute', 'normale', 'basse']
 
 let apiServer: Server | null = null
 let apiInfo: ApiInfo | null = null
+
+function normalizePort(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= 65535
+    ? value
+    : null
+}
 
 function sendJson(res: ServerResponse, statusCode: number, payload: unknown): void {
   res.writeHead(statusCode, {
@@ -120,14 +129,70 @@ function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
   })
 }
 
-function buildApiInfo(port: number): ApiInfo {
+function getPreferredPort(): number {
+  const portFromEnv = normalizePort(Number(process.env.BANETTE_API_PORT))
+  if (portFromEnv) return portFromEnv
+
+  const portFromSettings = normalizePort(getSettings().apiPort)
+  return portFromSettings ?? DEFAULT_API_PORT
+}
+
+function buildApiInfo(port: number, preferredPort: number): ApiInfo {
   return {
     enabled: true,
     host: API_HOST,
     port,
     baseUrl: `http://${API_HOST}:${port}`,
-    storagePath: getCurrentStoragePath()
+    storagePath: getCurrentStoragePath(),
+    preferredPort,
+    usingFallbackPort: port !== preferredPort
   }
+}
+
+async function listenWithFallback(server: Server, preferredPort: number): Promise<number> {
+  let portToTry = preferredPort
+
+  for (let attempts = 0; attempts < 10; attempts += 1) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const handleError = (error: Error & { code?: string }) => {
+          server.off('listening', handleListening)
+          reject(error)
+        }
+        const handleListening = () => {
+          server.off('error', handleError)
+          resolve()
+        }
+
+        server.once('error', handleError)
+        server.once('listening', handleListening)
+        server.listen(portToTry, API_HOST)
+      })
+      return portToTry
+    } catch (error) {
+      const err = error as Error & { code?: string }
+      if (err.code !== 'EADDRINUSE') throw err
+      portToTry += 1
+    }
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const handleError = (error: Error) => {
+      server.off('listening', handleListening)
+      reject(error)
+    }
+    const handleListening = () => {
+      server.off('error', handleError)
+      resolve()
+    }
+
+    server.once('error', handleError)
+    server.once('listening', handleListening)
+    server.listen(0, API_HOST)
+  })
+
+  const address = server.address() as AddressInfo | null
+  return address?.port ?? preferredPort
 }
 
 async function handleNotes(req: IncomingMessage, res: ServerResponse, pathname: string): Promise<void> {
@@ -318,23 +383,15 @@ async function requestListener(req: IncomingMessage, res: ServerResponse): Promi
 export async function startApiServer(): Promise<ApiInfo> {
   if (apiInfo) return apiInfo
 
-  const portFromEnv = Number(process.env.BANETTE_API_PORT)
-  const port = Number.isInteger(portFromEnv) && portFromEnv > 0 ? portFromEnv : DEFAULT_API_PORT
+  const preferredPort = getPreferredPort()
 
   apiServer = createServer((req, res) => {
     void requestListener(req, res)
   })
 
-  await new Promise<void>((resolve, reject) => {
-    apiServer?.once('error', reject)
-    apiServer?.listen(port, API_HOST, () => {
-      apiServer?.off('error', reject)
-      resolve()
-    })
-  })
-
+  const actualPort = await listenWithFallback(apiServer, preferredPort)
   const address = apiServer.address() as AddressInfo | null
-  apiInfo = buildApiInfo(address?.port ?? port)
+  apiInfo = buildApiInfo(address?.port ?? actualPort, preferredPort)
   return apiInfo
 }
 
@@ -354,6 +411,10 @@ export async function stopApiServer(): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     apiServer?.close((error) => {
       if (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ERR_SERVER_NOT_RUNNING') {
+          resolve()
+          return
+        }
         reject(error)
         return
       }
@@ -363,4 +424,11 @@ export async function stopApiServer(): Promise<void> {
 
   apiServer = null
   apiInfo = null
+}
+
+export async function restartApiServer(): Promise<ApiInfo> {
+  if (apiServer) {
+    await stopApiServer()
+  }
+  return startApiServer()
 }
