@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+squashfs-root/
 
 # Claude Code internal
 .claude/
