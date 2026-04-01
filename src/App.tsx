@@ -3,7 +3,8 @@ import { Sidebar } from './components/Sidebar'
 import { ItemList } from './components/ItemList'
 import { ItemDetail } from './components/ItemDetail'
 import { SettingsPanel } from './components/SettingsPanel'
-import { Note, Todo, ItemType, AnyItem } from './types'
+import { Note, Todo, ItemType, AnyItem, isTimerProject, TimerProject } from './types'
+import { TimerDetail } from './components/TimerDetail'
 
 type View = 'list' | 'detail'
 
@@ -97,7 +98,16 @@ export function App(): JSX.Element {
               onImported={handleImported}
             />
           )}
-          {view === 'detail' && selectedItem && (
+          {view === 'detail' && selectedItem && isTimerProject(selectedItem) && (
+            <TimerDetail
+              item={selectedItem as TimerProject}
+              onBack={handleBack}
+              onDeleted={handleDeleted}
+              onSaved={handleSaved}
+              onOpenSettings={() => setShowSettings(true)}
+            />
+          )}
+          {view === 'detail' && selectedItem && !isTimerProject(selectedItem) && (
             <ItemDetail
               item={selectedItem as Note | Todo}
               type={activeSection}

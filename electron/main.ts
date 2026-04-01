@@ -1,17 +1,21 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, dialog, globalShortcut } from 'electron'
+import { app, BrowserWindow, ipcMain, Notification, shell, dialog, globalShortcut } from 'electron'
 import * as fs from 'fs'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import {
   listNotes, getNote, createNote, updateNote, deleteNote, reorderNotes,
   listTodos, getTodo, createTodo, updateTodo, deleteTodo, reorderTodos,
-  getNotePath, getTodoPath, getCurrentStoragePath, importMarkdownFiles
+  listTimers, getTimer, createTimer, updateTimer, deleteTimer, reorderTimers,
+  getNotePath, getTodoPath, getCurrentStoragePath, importMarkdownFiles,
+  stopAllRunningTimers
 } from './fileSystem'
 import { getSettings, setSettings } from './settings'
 import { getApiInfo, startApiServer, stopApiServer, restartApiServer } from './apiServer'
 
 let mainWindow: BrowserWindow | null = null
-let tray: Tray | null = null
+
+// Track which alert slots have already fired today to avoid repeating every minute
+const notifiedSlots = new Set<string>()
 
 function showMainWindow(): void {
   if (!mainWindow || mainWindow.isDestroyed()) return
@@ -61,10 +65,6 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  mainWindow.on('close', () => {
-    mainWindow = null
-  })
-
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -76,29 +76,64 @@ function createWindow(): void {
   }, 1500)
 }
 
-function createTray(): void {
-  const icon = nativeImage.createEmpty()
-  tray = new Tray(icon)
+function pruneNotifiedSlots(): void {
+  const today = new Date().toISOString().split('T')[0]
+  for (const key of notifiedSlots) {
+    if (!key.startsWith(today)) notifiedSlots.delete(key)
+  }
+}
 
-  const contextMenu = Menu.buildFromTemplate([
-    {
-      label: 'Ouvrir Banette',
-      click: () => { showMainWindow() }
-    },
-    { type: 'separator' },
-    { label: 'Quitter', click: () => { app.exit(0) } }
-  ])
+function checkWorkHoursAlerts(): void {
+  pruneNotifiedSlots()
+  const { workHours } = getSettings()
+  if (!workHours.enabled) return
 
-  tray.setToolTip('Banette')
-  tray.setContextMenu(contextMenu)
+  const timers = listTimers()
+  const running = timers.filter((t) => t.running_since)
+  if (running.length === 0) return
 
-  tray.on('click', () => {
-    if (mainWindow?.isVisible()) {
-      mainWindow.hide()
-    } else {
-      showMainWindow()
+  const now = new Date()
+  const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+  const today = dayNames[now.getDay()]
+  if (!workHours.days.includes(today)) return
+
+  const todayStr = now.toISOString().split('T')[0]
+  const alertMs = (workHours.alertMinutes ?? 15) * 60 * 1000
+
+  const slots = [
+    { key: 'lunch', slot: workHours.lunchBreak, label: 'pause déjeuner' },
+    { key: 'end', slot: workHours.endOfDay, label: 'fin de journée' }
+  ].filter(({ slot }) => slot.enabled && slot.time)
+
+  for (const { key, slot, label } of slots) {
+    const [h, m] = slot.time.split(':').map(Number)
+    const slotDate = new Date(now)
+    slotDate.setHours(h, m, 0, 0)
+
+    const diffMs = slotDate.getTime() - now.getTime()
+    const notifKey = `${todayStr}-${key}`
+
+    if (diffMs >= 0 && diffMs <= alertMs && !notifiedSlots.has(notifKey)) {
+      notifiedSlots.add(notifKey)
+
+      const diffMin = Math.round(diffMs / 60000)
+      const names = running.map((t) => `"${t.title}"`).join(', ')
+      const timeStr = diffMin <= 1 ? 'maintenant' : `dans ${diffMin} min`
+
+      const notification = new Notification({
+        title: 'Banette — Timer en cours',
+        body: `${names} tourne encore. ${label} ${timeStr}.`,
+        silent: false
+      })
+
+      notification.on('click', () => {
+        mainWindow?.show()
+        mainWindow?.focus()
+      })
+
+      notification.show()
     }
-  })
+  }
 }
 
 function wrapHandler<T>(fn: () => T): T | { error: string } {
@@ -127,6 +162,14 @@ function registerIpcHandlers(): void {
   ipcMain.handle('todos:update', (_e, id: string, updates: Parameters<typeof updateTodo>[1]) => wrapHandler(() => updateTodo(id, updates)))
   ipcMain.handle('todos:delete', (_e, id: string) => wrapHandler(() => deleteTodo(id)))
   ipcMain.handle('todos:reorder', (_e, ids: string[]) => wrapHandler(() => reorderTodos(ids)))
+
+  // Timers
+  ipcMain.handle('timers:list', () => wrapHandler(() => listTimers()))
+  ipcMain.handle('timers:get', (_e, id: string) => wrapHandler(() => getTimer(id)))
+  ipcMain.handle('timers:create', (_e, title: string) => wrapHandler(() => createTimer(title)))
+  ipcMain.handle('timers:update', (_e, id: string, updates: Parameters<typeof updateTimer>[1]) => wrapHandler(() => updateTimer(id, updates)))
+  ipcMain.handle('timers:delete', (_e, id: string) => wrapHandler(() => deleteTimer(id)))
+  ipcMain.handle('timers:reorder', (_e, ids: string[]) => wrapHandler(() => reorderTimers(ids)))
 
   // Export
   ipcMain.handle('item:export', async (_e, type: 'notes' | 'todos', id: string) => {
@@ -170,7 +213,7 @@ function registerIpcHandlers(): void {
     storagePath: getCurrentStoragePath()
   })))
 
-  ipcMain.handle('settings:set', async (_e, updates: { darkMode?: boolean; storagePath?: string | null; apiPort?: number | null }) => {
+  ipcMain.handle('settings:set', async (_e, updates: Parameters<typeof setSettings>[0]) => {
     try {
       const previous = getSettings()
       const next = setSettings(updates)
@@ -210,9 +253,7 @@ function registerIpcHandlers(): void {
       else mainWindow?.maximize()
     }
   })
-  ipcMain.handle('window:close', () => {
-    mainWindow?.close()
-  })
+  ipcMain.handle('window:close', () => mainWindow?.close())
 }
 
 app.whenReady().then(() => {
@@ -235,19 +276,14 @@ app.whenReady().then(() => {
       console.error('[Banette API] failed to start', error)
     })
 
+  // Check work hours alerts every minute (only fires if a timer is running)
+  setInterval(checkWorkHoursAlerts, 60 * 1000)
+
   registerIpcHandlers()
   createWindow()
-  createTray()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
-})
-
-app.on('will-quit', () => {
-  globalShortcut.unregisterAll()
-  void stopApiServer().catch((error) => {
-    console.error('[Banette API] failed to stop cleanly', error)
   })
 })
 
@@ -257,6 +293,10 @@ app.on('window-all-closed', () => {
   }
 })
 
-app.on('before-quit', () => {
-  mainWindow?.removeAllListeners('close')
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
+  stopAllRunningTimers()
+  void stopApiServer().catch((error) => {
+    console.error('[Banette API] failed to stop cleanly', error)
+  })
 })

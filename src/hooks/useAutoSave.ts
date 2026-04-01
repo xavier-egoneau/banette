@@ -4,8 +4,9 @@ export function useAutoSave<T>(
   value: T,
   onSave: (value: T) => Promise<void>,
   delay: number = 800
-): { isSaving: boolean } {
+): { isSaving: boolean; lastSaved: Date | null } {
   const [isSaving, setIsSaving] = useState(false)
+  const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestValueRef = useRef(value)
   const isFirstRender = useRef(true)
@@ -18,6 +19,7 @@ export function useAutoSave<T>(
     setIsSaving(true)
     try {
       await onSave(latestValueRef.current)
+      setLastSaved(new Date())
     } finally {
       setIsSaving(false)
     }
@@ -28,21 +30,18 @@ export function useAutoSave<T>(
       isFirstRender.current = false
       return
     }
-
-    if (timerRef.current) {
-      clearTimeout(timerRef.current)
-    }
-
-    timerRef.current = setTimeout(() => {
-      save()
-    }, delay)
-
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => { save() }, delay)
     return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current)
-      }
+      if (timerRef.current) clearTimeout(timerRef.current)
     }
   }, [value, delay, save])
 
-  return { isSaving }
+  useEffect(() => {
+    if (!lastSaved) return
+    const t = setTimeout(() => setLastSaved(null), 3000)
+    return () => clearTimeout(t)
+  }, [lastSaved])
+
+  return { isSaving, lastSaved }
 }

@@ -9,7 +9,7 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faNoteSticky, faListCheck, faFileImport } from '@fortawesome/free-solid-svg-icons'
+import { faNoteSticky, faListCheck, faStopwatch, faFileImport } from '@fortawesome/free-solid-svg-icons'
 import { Note, Todo, ItemType, AnyItem, isTodo } from '../types'
 import { SearchBar } from './SearchBar'
 import { DeleteModal } from './DeleteModal'
@@ -41,7 +41,7 @@ export function ItemList({ type, onSelectItem, onRefreshRef, onImported }: ItemL
   )
 
   const loadItems = useCallback(async () => {
-    const channel = type === 'notes' ? 'notes:list' : 'todos:list'
+    const channel = type === 'notes' ? 'notes:list' : type === 'todos' ? 'todos:list' : 'timers:list'
     const result = await window.electron.invoke(channel)
     setItems(result as AnyItem[])
   }, [type])
@@ -73,21 +73,20 @@ export function ItemList({ type, onSelectItem, onRefreshRef, onImported }: ItemL
       const note = (await window.electron.invoke('notes:create', 'Nouvelle note', '')) as Note
       await loadItems()
       onSelectItem(note)
-    } else {
-      const todo = (await window.electron.invoke(
-        'todos:create',
-        'Nouvelle todo',
-        '',
-        'normale'
-      )) as Todo
+    } else if (type === 'todos') {
+      const todo = (await window.electron.invoke('todos:create', 'Nouvelle todo', '', 'normale')) as Todo
       await loadItems()
       onSelectItem(todo)
+    } else {
+      const timer = (await window.electron.invoke('timers:create', 'Nouveau projet')) as AnyItem
+      await loadItems()
+      onSelectItem(timer)
     }
   }, [type, loadItems, onSelectItem])
 
   const handleDelete = async () => {
     if (!deleteTarget) return
-    const channel = type === 'notes' ? 'notes:delete' : 'todos:delete'
+    const channel = type === 'notes' ? 'notes:delete' : type === 'todos' ? 'todos:delete' : 'timers:delete'
     await window.electron.invoke(channel, deleteTarget.id)
     setDeleteTarget(null)
     if (selectedId === deleteTarget.id) setSelectedId(null)
@@ -109,7 +108,7 @@ export function ItemList({ type, onSelectItem, onRefreshRef, onImported }: ItemL
     const reordered = arrayMove(items, oldIndex, newIndex)
     setItems(reordered)
 
-    const channel = type === 'notes' ? 'notes:reorder' : 'todos:reorder'
+    const channel = type === 'notes' ? 'notes:reorder' : type === 'todos' ? 'todos:reorder' : 'timers:reorder'
     await window.electron.invoke(channel, reordered.map((i) => i.id))
   }
 
@@ -147,7 +146,7 @@ export function ItemList({ type, onSelectItem, onRefreshRef, onImported }: ItemL
   }, [allTags, activeTag])
 
   const isSearching = search.length > 0
-  const isDraggable = sortMode === 'manual' && !isSearching
+  const isDraggable = sortMode === 'manual' && !isSearching && !activeTag
 
   const sortedItems = useMemo(() => {
     if (sortMode === 'manual') return items
@@ -182,7 +181,7 @@ export function ItemList({ type, onSelectItem, onRefreshRef, onImported }: ItemL
       {/* Header */}
       <div className="px-4 py-3 border-b border-paper-border flex items-center justify-between gap-3 drag-region">
         <span className="text-xs font-semibold text-ink-light uppercase tracking-wider font-ui select-none">
-          {type === 'notes' ? 'Notes' : 'Todos'}
+          {type === 'notes' ? 'Notes' : type === 'todos' ? 'Todos' : 'Timers'}
         </span>
         <div className="flex items-center gap-2 no-drag">
           <select
@@ -195,19 +194,21 @@ export function ItemList({ type, onSelectItem, onRefreshRef, onImported }: ItemL
             <option value="date">Date</option>
             {type === 'todos' && <option value="priority">Priorité</option>}
           </select>
-          <button
-            onClick={handleImport}
-            disabled={isImporting}
-            className="p-1.5 text-ink-light hover:text-ink transition-colors disabled:opacity-40"
-            title="Importer des fichiers .md"
-          >
-            <FontAwesomeIcon icon={faFileImport} className="text-sm" />
-          </button>
+          {type !== 'timers' && (
+            <button
+              onClick={handleImport}
+              disabled={isImporting}
+              className="p-1.5 text-ink-light hover:text-ink transition-colors disabled:opacity-40"
+              title="Importer des fichiers .md"
+            >
+              <FontAwesomeIcon icon={faFileImport} className="text-sm" />
+            </button>
+          )}
           <button
             onClick={handleCreate}
             className="px-3 py-1.5 bg-ink text-paper-light text-xs font-ui font-medium rounded-lg hover:bg-ink-dark transition-colors"
           >
-            + Ajouter
+            + {type === 'timers' ? 'Projet' : 'Ajouter'}
           </button>
         </div>
       </div>
@@ -241,11 +242,11 @@ export function ItemList({ type, onSelectItem, onRefreshRef, onImported }: ItemL
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full py-12 text-ink-light">
             <FontAwesomeIcon
-              icon={type === 'notes' ? faNoteSticky : faListCheck}
+              icon={type === 'notes' ? faNoteSticky : type === 'todos' ? faListCheck : faStopwatch}
               className="text-4xl mb-3 opacity-40"
             />
             <p className="text-sm font-ui">
-              {isSearching || activeTag ? 'Aucun résultat' : `Aucune ${type === 'notes' ? 'note' : 'todo'}`}
+              {isSearching || activeTag ? 'Aucun résultat' : type === 'notes' ? 'Aucune note' : type === 'todos' ? 'Aucune todo' : 'Aucun projet'}
             </p>
           </div>
         ) : !isDraggable ? (
@@ -262,9 +263,7 @@ export function ItemList({ type, onSelectItem, onRefreshRef, onImported }: ItemL
                 }}
                 onDelete={() => setDeleteTarget(item)}
                 onToggleCompleted={
-                  type === 'todos'
-                    ? (e) => handleToggleCompleted(e, item as Todo)
-                    : undefined
+                  type === 'todos' ? (e) => handleToggleCompleted(e, item as Todo) : undefined
                 }
               />
             ))}
@@ -289,9 +288,7 @@ export function ItemList({ type, onSelectItem, onRefreshRef, onImported }: ItemL
                     }}
                     onDelete={() => setDeleteTarget(item)}
                     onToggleCompleted={
-                      type === 'todos'
-                        ? (e) => handleToggleCompleted(e, item as Todo)
-                        : undefined
+                      type === 'todos' ? (e) => handleToggleCompleted(e, item as Todo) : undefined
                     }
                   />
                 ))}

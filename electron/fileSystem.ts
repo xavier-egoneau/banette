@@ -42,8 +42,12 @@ function getTodosDir(): string {
   return path.join(getBasePath(), 'todos')
 }
 
+function getTimersDir(): string {
+  return path.join(getBasePath(), 'timers')
+}
+
 function ensureDirectories(): void {
-  const dirs = [getBasePath(), getNotesDir(), getTodosDir()]
+  const dirs = [getBasePath(), getNotesDir(), getTodosDir(), getTimersDir()]
   for (const dir of dirs) {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true })
@@ -80,6 +84,10 @@ export function getNotePath(id: string): string {
 
 export function getTodoPath(id: string): string {
   return path.join(getTodosDir(), `${id}.md`)
+}
+
+export function getTimerPath(id: string): string {
+  return path.join(getTimersDir(), `${id}.md`)
 }
 
 export function getCurrentStoragePath(): string {
@@ -298,6 +306,166 @@ export function deleteTodo(id: string): boolean {
   if (!fs.existsSync(filePath)) return false
   fs.unlinkSync(filePath)
   return true
+}
+
+// Timers
+
+export interface TimerFile {
+  id: string
+  title: string
+  created: string
+  updated: string
+  order: number
+  content: string
+  tags: string[]
+  pinned: boolean
+  sessions: { id: string; date: string; seconds: number }[]
+  running_since: string | null
+  total_seconds: number
+}
+
+function parseSessions(value: unknown): { id: string; date: string; seconds: number }[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((s) => s && typeof s === 'object')
+    .map((s) => ({
+      id: String((s as Record<string, unknown>).id ?? uuidv4()),
+      date: String((s as Record<string, unknown>).date ?? ''),
+      seconds: typeof (s as Record<string, unknown>).seconds === 'number'
+        ? ((s as Record<string, unknown>).seconds as number)
+        : 0
+    }))
+}
+
+export function listTimers(): TimerFile[] {
+  ensureDirectories()
+  const dir = getTimersDir()
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith('.md'))
+
+  const timers: TimerFile[] = []
+  for (const file of files) {
+    try {
+      const filePath = path.join(dir, file)
+      const parsed = readMarkdownFile(filePath)
+      const data = parsed.data as Record<string, unknown>
+      timers.push({
+        id: String(data.id ?? ''),
+        title: String(data.title ?? ''),
+        created: String(data.created ?? ''),
+        updated: String(data.updated ?? ''),
+        order: typeof data.order === 'number' ? data.order : Infinity,
+        content: parsed.content.trim(),
+        tags: parseTags(data.tags),
+        pinned: Boolean(data.pinned ?? false),
+        sessions: parseSessions(data.sessions),
+        running_since: data.running_since ? String(data.running_since) : null,
+        total_seconds: typeof data.total_seconds === 'number' ? data.total_seconds : 0
+      })
+    } catch {
+      // Skip corrupted files silently
+    }
+  }
+
+  return sortByPinnedThenOrder(timers)
+}
+
+export function getTimer(id: string): TimerFile | null {
+  ensureDirectories()
+  const filePath = getTimerPath(id)
+  if (!fs.existsSync(filePath)) return null
+  try {
+    const parsed = readMarkdownFile(filePath)
+    const data = parsed.data as Record<string, unknown>
+    return {
+      id: String(data.id ?? ''),
+      title: String(data.title ?? ''),
+      created: String(data.created ?? ''),
+      updated: String(data.updated ?? ''),
+      order: typeof data.order === 'number' ? data.order : Infinity,
+      content: parsed.content.trim(),
+      tags: parseTags(data.tags),
+      pinned: Boolean(data.pinned ?? false),
+      sessions: parseSessions(data.sessions),
+      running_since: data.running_since ? String(data.running_since) : null,
+      total_seconds: typeof data.total_seconds === 'number' ? data.total_seconds : 0
+    }
+  } catch {
+    return null
+  }
+}
+
+export function createTimer(title: string): TimerFile {
+  ensureDirectories()
+  const id = uuidv4()
+  const now = new Date().toISOString()
+  const order = 0
+  writeMarkdownFile(
+    getTimerPath(id),
+    { id, title, created: now, updated: now, order, tags: [], pinned: false, sessions: [], running_since: null, total_seconds: 0 },
+    ''
+  )
+  return { id, title, created: now, updated: now, order, content: '', tags: [], pinned: false, sessions: [], running_since: null, total_seconds: 0 }
+}
+
+export function updateTimer(id: string, updates: Partial<Omit<TimerFile, 'id' | 'created'>>): TimerFile | null {
+  ensureDirectories()
+  const existing = getTimer(id)
+  if (!existing) return null
+  const now = new Date().toISOString()
+  const updated: TimerFile = { ...existing, ...updates, id, updated: now }
+  writeMarkdownFile(
+    getTimerPath(id),
+    {
+      id, title: updated.title, created: updated.created, updated: now,
+      order: updated.order, tags: updated.tags, pinned: updated.pinned,
+      sessions: updated.sessions, running_since: updated.running_since,
+      total_seconds: updated.total_seconds
+    },
+    updated.content
+  )
+  return updated
+}
+
+export function reorderTimers(orderedIds: string[]): void {
+  ensureDirectories()
+  for (const [index, id] of orderedIds.entries()) {
+    const filePath = getTimerPath(id)
+    if (!fs.existsSync(filePath)) continue
+    try {
+      const parsed = readMarkdownFile(filePath)
+      writeMarkdownFile(filePath, { ...parsed.data, order: index }, parsed.content)
+    } catch {
+      // Skip
+    }
+  }
+}
+
+export function deleteTimer(id: string): boolean {
+  ensureDirectories()
+  const filePath = getTimerPath(id)
+  if (!fs.existsSync(filePath)) return false
+  fs.unlinkSync(filePath)
+  return true
+}
+
+export function stopAllRunningTimers(): void {
+  const timers = listTimers()
+  const now = new Date()
+  for (const timer of timers) {
+    if (!timer.running_since) continue
+    const elapsedSeconds = Math.floor((now.getTime() - new Date(timer.running_since).getTime()) / 1000)
+    if (elapsedSeconds < 1) continue
+    const date = now.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const newSessions = [
+      ...timer.sessions,
+      { id: uuidv4(), date, seconds: elapsedSeconds }
+    ]
+    updateTimer(timer.id, {
+      sessions: newSessions,
+      running_since: null,
+      total_seconds: newSessions.reduce((sum, s) => sum + s.seconds, 0)
+    })
+  }
 }
 
 // Import
