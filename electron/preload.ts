@@ -5,6 +5,7 @@ const electronAPI = {
     const allowedChannels = [
       'notes:list', 'notes:get', 'notes:create', 'notes:update', 'notes:delete', 'notes:reorder',
       'todos:list', 'todos:get', 'todos:create', 'todos:update', 'todos:delete', 'todos:reorder',
+      'timers:list', 'timers:get', 'timers:create', 'timers:update', 'timers:delete', 'timers:reorder',
       'window:minimize', 'window:maximize', 'window:close',
       'item:export', 'item:import',
       'settings:get', 'settings:set',

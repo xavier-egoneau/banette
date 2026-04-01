@@ -1,8 +1,8 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faGripVertical, faTrash, faThumbtack } from '@fortawesome/free-solid-svg-icons'
-import { AnyItem, isTodo, Priority } from '../types'
+import { faGripVertical, faTrash, faThumbtack, faCircle } from '@fortawesome/free-solid-svg-icons'
+import { AnyItem, isTodo, isTimerProject, Priority } from '../types'
 
 function getPriorityColor(priority: Priority): string {
   switch (priority) {
@@ -18,6 +18,15 @@ function getPriorityLabel(priority: Priority): string {
     case 'normale': return 'Normale'
     case 'basse': return 'Basse'
   }
+}
+
+function formatTotalSeconds(total: number): string {
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  if (h === 0 && m === 0) return '0min'
+  if (h === 0) return `${m}min`
+  if (m === 0) return `${h}h`
+  return `${h}h ${m}min`
 }
 
 function formatDate(iso: string): string {
@@ -137,6 +146,19 @@ export function SortableItem({
             <span className={`w-1.5 h-1.5 rounded-full ${getPriorityColor(item.priority)}`} />
             {getPriorityLabel(item.priority)}
           </span>
+        )}
+        {isTimerProject(item) && (
+          <>
+            {item.running_since && (
+              <span className="inline-flex items-center gap-1 text-xs font-ui text-green-500">
+                <FontAwesomeIcon icon={faCircle} className="text-[8px] animate-pulse" />
+                En cours
+              </span>
+            )}
+            <span className="text-xs font-ui text-ink-light">
+              {formatTotalSeconds(item.total_seconds)}
+            </span>
+          </>
         )}
         <span className="text-xs text-ink-light font-ui">{formatDate(item.updated)}</span>
         {item.tags.map((tag) => (

@@ -1,5 +1,5 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faNoteSticky, faListCheck, faMoon, faSun, faGear } from '@fortawesome/free-solid-svg-icons'
+import { faNoteSticky, faListCheck, faStopwatch, faMoon, faSun, faGear } from '@fortawesome/free-solid-svg-icons'
 import { ItemType } from '../types'
 
 interface SidebarProps {
@@ -42,6 +42,18 @@ export function Sidebar({ activeSection, onSectionChange, darkMode, onToggleDark
         >
           <FontAwesomeIcon icon={faNoteSticky} className="w-4" />
           <span>Notes</span>
+        </button>
+
+        <button
+          onClick={() => onSectionChange('timers')}
+          className={`w-full text-left px-3 py-2.5 rounded-lg mb-1 text-sm font-ui transition-colors flex items-center gap-2 ${
+            activeSection === 'timers'
+              ? 'bg-paper-border text-ink-dark font-semibold'
+              : 'text-ink hover:bg-paper-line/50 hover:text-ink-dark'
+          }`}
+        >
+          <FontAwesomeIcon icon={faStopwatch} className="w-4" />
+          <span>Timers</span>
         </button>
       </nav>
 
