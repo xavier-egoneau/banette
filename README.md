@@ -1,17 +1,15 @@
 # Banette
 
-Application de bureau pour gérer des **notes** et des **todos**, avec un éditeur WYSIWYG et un stockage local en Markdown.
+Application de bureau pour gérer des **notes**, des **todos** et des **projets timer**, avec stockage local en Markdown, éditeur riche pour les contenus texte et API HTTP locale pour l'automatisation.
 
 ---
 
 ## Installation rapide
 
-Si tu veux juste installer les dépendances puis générer l'application :
-
 ### Prérequis
 
-- Installer [Node.js](https://nodejs.org/) v18 ou supérieur
-- npm est inclus avec Node.js
+- [Node.js](https://nodejs.org/) v18 ou supérieur
+- npm v9 ou supérieur
 
 ### Installer les dépendances
 
@@ -31,37 +29,69 @@ npm run dev
 npm run package
 ```
 
-Les fichiers générés sont placés dans `dist/`.
+Les artefacts sont générés dans `dist/`.
 
 ---
 
 ## Fonctionnalités
 
 ### Notes & Todos
+
 - Création, édition et suppression
-- Éditeur de texte enrichi (WYSIWYG) — **gras**, *italique*, ~~barré~~, titres H1/H2, listes, blocs de code avec coloration syntaxique, citations, listes de tâches
-- Auto-save 800 ms — indicateur "Enregistrement…" / "Sauvegardé"
-- **Todos** : priorité haute / normale / basse, marquage complété/en cours
+- Éditeur WYSIWYG pour les notes et todos: **gras**, *italique*, ~~barré~~, titres H1/H2, listes, citations, listes de tâches, blocs de code avec coloration syntaxique
+- Auto-save avec debounce de 800 ms et indicateur d'état
+- Todos avec priorité `haute` / `normale` / `basse` et statut terminé / en cours
+- Export Markdown de la note courante
+- Import de fichiers `.md` dans les sections notes et todos
+
+### Timers
+
+- Section dédiée `Timers` dans la sidebar
+- Création de projets timer
+- Démarrage / arrêt d'un chrono par projet
+- Enregistrement automatique des sessions passées
+- Édition manuelle des heures et minutes de chaque session
+- Suppression d'une session individuelle
+- Total cumulé par projet
+- Tags, épinglage, recherche et tri manuel / par date comme sur les autres items
 
 ### Organisation
-- **Tags** : ajout de tags par chips (Enter ou virgule), filtre par tag dans la liste
-- **Épingler** : épingler une note ou todo pour la garder en tête de liste
-- **Tri** : manuel (drag & drop), par date de modification, par priorité (todos)
-- **Recherche full-text** : cherche dans le titre et dans le contenu
+
+- Tags avec saisie rapide par `Enter` ou virgule
+- Filtre par tag dans la liste
+- Recherche plein texte sur le titre et le contenu
+- Épinglage des items importants
+- Tri manuel par drag & drop
+- Tri par date de modification
+- Tri par priorité pour les todos
 
 ### Interface
-- Sidebar navigation **Todos** / **Notes**
-- Raccourci `Ctrl+N` pour créer, `Suppr` / `Backspace` pour supprimer l'item sélectionné
-- **Raccourci global `Cmd+Shift+B`** (ou `Ctrl+Shift+B`) pour ouvrir Banette depuis n'importe quelle app
-- **Mode aperçu** : bascule l'éditeur en lecture seule (bouton 👁 / ✏️)
-- **Export .md** : exporte la note courante vers un fichier Markdown via boîte de dialogue système
-- Icône tray — l'app se minimise dans la barre système au lieu de se fermer
-- Fenêtre sans bordure, esthétique bloc-notes (fond jaune, lignes de papier)
+
+- Navigation latérale `Todos` / `Notes` / `Timers`
+- Raccourci `Ctrl+N` / `Cmd+N` pour créer un item dans la section courante
+- `Suppr` / `Backspace` pour supprimer l'item sélectionné
+- Raccourci global `Ctrl+Shift+B` / `Cmd+Shift+B` pour rouvrir Banette
+- Mode aperçu pour les notes et todos
+- Fenêtre sans bordure avec minimisation en tray
+- Mode sombre
+- Panneau de paramètres pour le dossier de stockage, le port API local et les alertes d'heures de travail
+
+### Alertes d'heures de travail
+
+- Configuration des jours de travail
+- Alertes optionnelles avant la pause déjeuner et avant la fin de journée
+- Nombre de minutes d'anticipation configurable
+- Les alertes ne s'appliquent que lorsqu'un timer tourne
 
 ### Stockage
-- Fichiers locaux dans `Documents/Banette/` — aucune donnée envoyée sur internet
-- Format : Markdown avec frontmatter YAML
-- API HTTP locale en lecture/écriture sur `127.0.0.1` pour automatisation par une IA ou des scripts, configurable dans l'app
+
+- Données stockées localement dans `Documents/Banette/` par défaut
+- Dossier de stockage configurable depuis l'application
+- Format Markdown + frontmatter YAML
+- Aucune donnée envoyée sur internet par défaut
+- API HTTP locale en lecture / écriture sur `127.0.0.1`
+
+Exemple de note:
 
 ```markdown
 ---
@@ -69,6 +99,7 @@ id: 3f2a1b...
 title: Ma première note
 created: 2025-01-15T10:00:00.000Z
 updated: 2025-01-15T10:05:00.000Z
+order: 0
 tags: [travail, idées]
 pinned: false
 ---
@@ -89,7 +120,7 @@ Contenu de la note en **Markdown**.
 | Éditeur | TipTap 2 + tiptap-markdown |
 | Coloration syntaxique | lowlight + highlight.js |
 | Drag & drop | @dnd-kit |
-| Icônes | FontAwesome 6 |
+| Icônes | FontAwesome |
 | Parsing Markdown | gray-matter |
 | IPC | contextBridge Electron |
 | API locale | HTTP Node.js sur `127.0.0.1` |
@@ -97,11 +128,6 @@ Contenu de la note en **Markdown**.
 ---
 
 ## Développement
-
-### Prérequis
-
-- [Node.js](https://nodejs.org/) v18 ou supérieur
-- npm v9 ou supérieur
 
 ### Cloner et installer
 
@@ -117,11 +143,19 @@ npm install
 npm run dev
 ```
 
-Lance l'application Electron avec hot-reload via electron-vite.
+L'application Electron démarre avec hot reload via `electron-vite`.
 
-L’API locale démarre automatiquement avec l’application sur `http://127.0.0.1:3210` par défaut.
-Le port préféré peut être configuré dans les paramètres de l’application, ou surchargé via la variable d’environnement `BANETTE_API_PORT`.
-Si le port demandé est déjà occupé, Banette bascule automatiquement sur le prochain port libre.
+L'API locale démarre automatiquement sur `http://127.0.0.1:3210` par défaut.
+Le port préféré peut être configuré dans les paramètres ou surchargé avec `BANETTE_API_PORT`.
+Si le port demandé est occupé, Banette bascule automatiquement sur le prochain port libre.
+
+Script utile:
+
+```bash
+npm run dev:3211
+```
+
+Ce script démarre Banette avec un port API préféré à `3211`.
 
 ### Build de production
 
@@ -137,7 +171,7 @@ Compile les sources dans `out/`.
 npm run mcp
 ```
 
-Ce serveur MCP fonctionne en `stdio` et est destiné à être lancé par un client compatible MCP, pas à rester exposé sur un port.
+Le serveur MCP fonctionne en `stdio` et doit être lancé par un client compatible MCP.
 
 ### Packager l'installateur
 
@@ -145,11 +179,11 @@ Ce serveur MCP fonctionne en `stdio` et est destiné à être lancé par un clie
 npm run package
 ```
 
-Génère les artefacts de build dans `dist/`.
+Génère les artefacts dans `dist/`.
 
 ### Installer localement sous Linux
 
-Après génération de l'AppImage, tu peux intégrer Banette au menu d'applications avec :
+Après génération de l'AppImage:
 
 ```bash
 chmod +x scripts/install-linux-appimage.sh
@@ -162,30 +196,40 @@ Le script copie l'AppImage dans `~/.local/bin`, installe l'icône dans `~/.local
 
 ## Structure du projet
 
-```
+```text
 banette/
 ├── electron/
-│   ├── main.ts          # Process principal (fenêtre, tray, IPC, raccourci global)
-│   ├── preload.ts       # Bridge sécurisé renderer ↔ main (contextBridge)
-│   └── fileSystem.ts    # Lecture/écriture des fichiers Markdown
+│   ├── main.ts           # Fenêtre, tray, IPC, raccourci global, alertes timer
+│   ├── preload.ts        # Bridge sécurisé renderer ↔ main
+│   ├── fileSystem.ts     # Lecture/écriture des notes, todos et timers en Markdown
+│   ├── apiServer.ts      # API HTTP locale
+│   └── settings.ts       # Persistance des paramètres utilisateur
+├── scripts/
+│   ├── banette-mcp.js    # Serveur MCP stdio
+│   └── install-linux-appimage.sh
 ├── src/
 │   ├── components/
-│   │   ├── Sidebar.tsx           # Navigation Todos / Notes
-│   │   ├── ItemList.tsx          # Liste avec recherche, tri, filtre par tag
-│   │   ├── ItemDetail.tsx        # Vue détail : éditeur, tags, pin, aperçu, export
-│   │   ├── Editor.tsx            # Éditeur TipTap + toolbar
-│   │   ├── CodeBlockComponent.tsx# Bloc de code avec sélecteur de langage
-│   │   ├── SortableItem.tsx      # Item de liste draggable (pin, tags, priorité)
-│   │   ├── SearchBar.tsx         # Barre de recherche
-│   │   └── DeleteModal.tsx       # Modale de confirmation suppression
+│   │   ├── Sidebar.tsx
+│   │   ├── ItemList.tsx
+│   │   ├── ItemDetail.tsx
+│   │   ├── TimerDetail.tsx
+│   │   ├── SettingsPanel.tsx
+│   │   ├── Editor.tsx
+│   │   ├── SortableItem.tsx
+│   │   ├── SearchBar.tsx
+│   │   ├── DeleteModal.tsx
+│   │   └── CodeBlockComponent.tsx
 │   ├── hooks/
-│   │   └── useAutoSave.ts        # Hook debounce 800ms pour l'auto-save
+│   │   ├── useAutoSave.ts
+│   │   └── useTagEditor.ts
 │   ├── types/
-│   │   ├── index.ts              # Types Note, Todo, Priority…
-│   │   └── electron.d.ts         # Déclaration window.electron pour TypeScript
+│   │   ├── index.ts
+│   │   └── electron.d.ts
+│   ├── utils/
+│   │   └── format.ts
 │   ├── App.tsx
 │   ├── main.tsx
-│   └── index.css                 # Styles ProseMirror + effet lignes de papier
+│   └── index.css
 ├── electron.vite.config.ts
 ├── electron-builder.yml
 ├── tailwind.config.js
@@ -196,30 +240,35 @@ banette/
 
 ## Données utilisateur
 
-```
+Structure par défaut:
+
+```text
 Documents/Banette/
 ├── notes/
 │   ├── <uuid>.md
 │   └── ...
-└── todos/
+├── todos/
+│   ├── <uuid>.md
+│   └── ...
+└── timers/
     ├── <uuid>.md
     └── ...
 ```
 
-Fichiers Markdown standard, lisibles et modifiables avec n'importe quel éditeur de texte.
+Les fichiers restent lisibles et modifiables avec n'importe quel éditeur texte.
 
 ---
 
 ## API locale
 
-L’application expose une API HTTP locale pensée pour l’automatisation. Elle est accessible uniquement en local sur `127.0.0.1`.
+L'application expose une API HTTP locale pour l'automatisation. Elle n'écoute que sur `127.0.0.1`.
 
 ### Santé et infos
 
 - `GET /api/health`
 - `GET /api/info`
 
-Exemple :
+Exemple:
 
 ```bash
 curl http://127.0.0.1:3210/api/health
@@ -233,7 +282,7 @@ curl http://127.0.0.1:3210/api/health
 - `PATCH /api/notes/:id`
 - `DELETE /api/notes/:id`
 
-Créer une note :
+Créer une note:
 
 ```bash
 curl -X POST http://127.0.0.1:3210/api/notes \
@@ -246,7 +295,7 @@ curl -X POST http://127.0.0.1:3210/api/notes \
   }'
 ```
 
-Modifier une note :
+Modifier une note:
 
 ```bash
 curl -X PATCH http://127.0.0.1:3210/api/notes/<id> \
@@ -265,7 +314,7 @@ curl -X PATCH http://127.0.0.1:3210/api/notes/<id> \
 - `PATCH /api/todos/:id`
 - `DELETE /api/todos/:id`
 
-Créer une todo :
+Créer une todo:
 
 ```bash
 curl -X POST http://127.0.0.1:3210/api/todos \
@@ -279,7 +328,7 @@ curl -X POST http://127.0.0.1:3210/api/todos \
   }'
 ```
 
-Modifier une todo :
+Modifier une todo:
 
 ```bash
 curl -X PATCH http://127.0.0.1:3210/api/todos/<id> \
@@ -290,9 +339,43 @@ curl -X PATCH http://127.0.0.1:3210/api/todos/<id> \
   }'
 ```
 
+### Timers
+
+- `GET /api/timers`
+- `POST /api/timers`
+- `GET /api/timers/:id`
+- `PATCH /api/timers/:id`
+- `DELETE /api/timers/:id`
+
+Créer un projet timer:
+
+```bash
+curl -X POST http://127.0.0.1:3210/api/timers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Client A",
+    "tags": ["facturation", "avril"],
+    "pinned": true
+  }'
+```
+
+Mettre à jour un timer:
+
+```bash
+curl -X PATCH http://127.0.0.1:3210/api/timers/<id> \
+  -H "Content-Type: application/json" \
+  -d '{
+    "running_since": null,
+    "total_seconds": 5400,
+    "sessions": [
+      { "id": "session-1", "date": "02/04/2026", "seconds": 5400 }
+    ]
+  }'
+```
+
 ### Formats JSON
 
-Les réponses de lecture utilisent le format :
+Les réponses de lecture utilisent le format:
 
 ```json
 {
@@ -300,7 +383,7 @@ Les réponses de lecture utilisent le format :
 }
 ```
 
-Les erreurs utilisent le format :
+Les erreurs utilisent le format:
 
 ```json
 {
@@ -310,23 +393,26 @@ Les erreurs utilisent le format :
 
 ### Champs acceptés
 
-- Note : `title`, `content`, `tags`, `pinned`
-- Todo : `title`, `content`, `priority`, `completed`, `tags`, `pinned`
-- Priorités valides : `haute`, `normale`, `basse`
+- Note: `title`, `content`, `tags`, `pinned`
+- Todo: `title`, `content`, `priority`, `completed`, `tags`, `pinned`
+- Timer: `title`, `tags`, `pinned`, `sessions`, `running_since`, `total_seconds`
+- Priorités valides: `haute`, `normale`, `basse`
 
 ---
 
 ## MCP local
 
-Un serveur MCP local est fourni pour permettre à un client compatible MCP de piloter Banette sans accès direct au système de fichiers.
+Un serveur MCP local permet à un client compatible MCP de piloter Banette sans accès direct au système de fichiers.
 
 ### Outil fourni
 
-- Commande : `npm run mcp`
-- Mode : `stdio`
-- Dépendance : nécessite que Banette soit ouverte pour que l’API locale `http://127.0.0.1:3210` réponde
+- Commande: `npm run mcp`
+- Mode: `stdio`
+- Dépendance: Banette doit être ouverte pour que l'API locale réponde
 
 ### Outils MCP exposés
+
+Actuellement, le MCP couvre les **notes** et **todos**. Les **timers** restent disponibles via l'API locale HTTP, mais ne sont pas encore exposés comme outils MCP.
 
 - `banette_health`
 - `banette_ensure_ready`
@@ -339,9 +425,9 @@ Un serveur MCP local est fourni pour permettre à un client compatible MCP de pi
 - `update_todo`
 - `delete_todo`
 
-### Intégration Claude Code / Cowork (via plugin)
+### Intégration Claude Code / Cowork via plugin
 
-Le fichier `banette.plugin` embarque un `.mcp.json` qui enregistre automatiquement le serveur MCP auprès de Claude Code :
+Le fichier `banette.plugin` embarque un `.mcp.json` qui enregistre automatiquement le serveur MCP auprès de Claude Code:
 
 ```json
 {
@@ -358,27 +444,21 @@ Le fichier `banette.plugin` embarque un `.mcp.json` qui enregistre automatiqueme
 }
 ```
 
-`${CLAUDE_PLUGIN_ROOT}` est une variable résolue par Claude Code au moment du chargement du plugin — elle pointe vers le dossier d’installation du plugin.
+Prérequis:
 
-**Prérequis pour que ça fonctionne :**
+1. Installer `banette.plugin` dans Claude Code.
+2. Garder Banette ouverte, via l'app packagée ou `npm run dev`.
+3. Redémarrer Claude Code après installation du plugin.
 
-1. Le plugin `banette.plugin` doit être installé dans Claude Code
-2. Banette (app packagée ou `npm run dev`) doit être **ouverte** — le MCP s’y connecte via l’API HTTP locale, il ne peut pas la lancer tout seul dans ce mode
-3. Claude Code doit être redémarré après installation du plugin pour que les outils MCP soient chargés
-
-> ⚠️ Lancer `npm run mcp` manuellement ne sert à rien dans ce contexte : le serveur MCP fonctionne en `stdio` et doit être démarré par Claude Code comme process enfant, pas en standalone.
-
-**Vérifier que l’API est bien démarrée :**
+Vérification rapide:
 
 ```bash
 curl http://127.0.0.1:3210/api/health
 ```
 
-Doit retourner `{"data":{"status":"ok",...}}`. Si ce n’est pas le cas, l’app Banette n’est pas ouverte ou a planté au démarrage.
+### Intégration Claude Code sans plugin
 
-### Intégration Claude Code (sans plugin, via `.mcp.json` projet)
-
-Pour brancher Banette dans un projet Claude Code, ajouter dans `.mcp.json` à la racine du projet :
+Exemple de `.mcp.json` à la racine d'un projet:
 
 ```json
 {
@@ -386,62 +466,43 @@ Pour brancher Banette dans un projet Claude Code, ajouter dans `.mcp.json` à la
     "banette": {
       "command": "npm",
       "args": ["run", "mcp"],
-      "cwd": "/Users/xavieregoneau/projets/banette"
+      "cwd": "/chemin/vers/banette"
     }
   }
 }
 ```
 
-Si tu utilises un autre port pour l’API Banette, ajoute `BANETTE_API_BASE_URL` côté client MCP.
+Si Banette écoute sur un autre port, définir `BANETTE_API_BASE_URL` côté client MCP.
 
-### Lancement automatique de l’app
+### Lancement automatique de l'app
 
-Le serveur MCP peut tenter de lancer Banette si l’API locale ne répond pas encore.
+Le serveur MCP peut tenter de lancer Banette si l'API locale ne répond pas encore.
 
-Ordre de tentative :
+Ordre de tentative:
 
 - `BANETTE_LAUNCH_COMMAND` si fourni
 - `open -a Banette` sur macOS
-- `dist/mac/Banette.app` si présent dans le repo
+- `dist/mac/Banette.app` si présent
 - `npm run dev` comme fallback depuis le repo
 
-Variables utiles :
+Variables utiles:
 
 - `BANETTE_API_BASE_URL`
 - `BANETTE_LAUNCH_COMMAND`
 - `BANETTE_APP_CWD`
 
-Exemple de config MCP avec lancement explicite :
+### Fallback: écriture directe dans les fichiers
 
-```json
-{
-  "mcpServers": {
-    "banette": {
-      "command": "npm",
-      "args": ["run", "mcp"],
-      "cwd": "/Users/xavieregoneau/projets/banette",
-      "env": {
-        "BANETTE_LAUNCH_COMMAND": "open -a Banette"
-      }
-    }
-  }
-}
-```
+Si le MCP n'est pas disponible, il reste possible d'interagir directement avec les fichiers Markdown dans le dossier de stockage retourné par `/api/health`.
 
-### Fallback : écriture directe dans les fichiers
-
-Si le MCP n’est pas disponible (outils non chargés dans la session courante), il est possible d’interagir directement avec les fichiers de stockage — le format est du Markdown standard avec frontmatter YAML.
-
-Le chemin de stockage est retourné par `/api/health` (`storagePath`), par défaut `~/Documents/Banette/`.
-
-**Format d’un fichier todo :**
+Format d'un fichier todo:
 
 ```markdown
 ---
 id: <uuid-v4>
 title: Titre de la todo
-created: ‘2026-03-27T00:00:00.000Z’
-updated: ‘2026-03-27T00:00:00.000Z’
+created: '2026-03-27T00:00:00.000Z'
+updated: '2026-03-27T00:00:00.000Z'
 order: 0
 priority: normale
 completed: false
@@ -452,14 +513,14 @@ pinned: false
 Contenu optionnel en Markdown.
 ```
 
-**Format d’un fichier note :**
+Format d'un fichier note:
 
 ```markdown
 ---
 id: <uuid-v4>
 title: Titre de la note
-created: ‘2026-03-27T00:00:00.000Z’
-updated: ‘2026-03-27T00:00:00.000Z’
+created: '2026-03-27T00:00:00.000Z'
+updated: '2026-03-27T00:00:00.000Z'
 order: 0
 tags: []
 pinned: false
@@ -468,4 +529,24 @@ pinned: false
 Contenu en **Markdown**.
 ```
 
-Chaque fichier est nommé `<uuid>.md` et placé dans `todos/` ou `notes/`. Banette surveille le dossier et recharge automatiquement les fichiers modifiés.
+Format d'un fichier timer:
+
+```markdown
+---
+id: <uuid-v4>
+title: Nom du projet
+created: '2026-03-27T00:00:00.000Z'
+updated: '2026-03-27T00:00:00.000Z'
+order: 0
+tags: []
+pinned: false
+sessions:
+  - id: <uuid-v4>
+    date: '02/04/2026'
+    seconds: 5400
+running_since: null
+total_seconds: 5400
+---
+```
+
+Chaque fichier est nommé `<uuid>.md` et placé dans `notes/`, `todos/` ou `timers/`.
