@@ -23,6 +23,16 @@ function showMainWindow(): void {
   mainWindow.focus()
 }
 
+function getWindowIconPath(): string | undefined {
+  if (process.platform !== 'win32') return undefined
+
+  if (app.isPackaged) {
+    return join(process.resourcesPath, 'icon.ico')
+  }
+
+  return join(__dirname, '../../build/icon.ico')
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 700,
@@ -36,6 +46,7 @@ function createWindow(): void {
     autoHideMenuBar: true,
     center: true,
     backgroundColor: '#FFF8E7',
+    icon: getWindowIconPath(),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,

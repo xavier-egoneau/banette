@@ -4,6 +4,37 @@ Application de bureau pour gérer des **notes** et des **todos**, avec un édite
 
 ---
 
+## Installation rapide
+
+Si tu veux juste installer les dépendances puis générer l'application :
+
+### Prérequis
+
+- Installer [Node.js](https://nodejs.org/) v18 ou supérieur
+- npm est inclus avec Node.js
+
+### Installer les dépendances
+
+```bash
+npm install
+```
+
+### Lancer l'app en développement
+
+```bash
+npm run dev
+```
+
+### Packager l'application
+
+```bash
+npm run package
+```
+
+Les fichiers générés sont placés dans `dist/`.
+
+---
+
 ## Fonctionnalités
 
 ### Notes & Todos
@@ -65,7 +96,7 @@ Contenu de la note en **Markdown**.
 
 ---
 
-## Installation & développement
+## Développement
 
 ### Prérequis
 
@@ -114,7 +145,7 @@ Ce serveur MCP fonctionne en `stdio` et est destiné à être lancé par un clie
 npm run package
 ```
 
-Génère un installateur dans `dist/`.
+Génère les artefacts de build dans `dist/`.
 
 ### Installer localement sous Linux
 
