@@ -146,7 +146,7 @@ export function ItemList({ type, onSelectItem, onRefreshRef, onImported }: ItemL
   }, [allTags, activeTag])
 
   const isSearching = search.length > 0
-  const isDraggable = sortMode === 'manual' && !isSearching
+  const isDraggable = sortMode === 'manual' && !isSearching && !activeTag
 
   const sortedItems = useMemo(() => {
     if (sortMode === 'manual') return items
@@ -193,7 +193,6 @@ export function ItemList({ type, onSelectItem, onRefreshRef, onImported }: ItemL
             <option value="manual">Manuel</option>
             <option value="date">Date</option>
             {type === 'todos' && <option value="priority">Priorité</option>}
-            {type === 'timers' && null}
           </select>
           {type !== 'timers' && (
             <button

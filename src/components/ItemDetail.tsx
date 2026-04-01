@@ -5,6 +5,8 @@ import { Note, Todo, ItemType, isTodo, Priority } from '../types'
 import { Editor } from './Editor'
 import { DeleteModal } from './DeleteModal'
 import { useAutoSave } from '../hooks/useAutoSave'
+import { useTagEditor } from '../hooks/useTagEditor'
+import { formatDate } from '../utils/format'
 
 interface ItemDetailProps {
   item: Note | Todo
@@ -12,15 +14,6 @@ interface ItemDetailProps {
   onBack: () => void
   onDeleted: () => void
   onSaved?: () => void
-}
-
-function formatDate(iso: string): string {
-  const date = new Date(iso)
-  return date.toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  })
 }
 
 const PRIORITY_OPTIONS: { value: Priority; label: string; color: string }[] = [
@@ -34,19 +27,17 @@ export function ItemDetail({ item, type, onBack, onDeleted, onSaved }: ItemDetai
   const [content, setContent] = useState(item.content)
   const [priority, setPriority] = useState<Priority>(isTodo(item) ? item.priority : 'normale')
   const [completed, setCompleted] = useState(isTodo(item) ? item.completed : false)
-  const [tags, setTags] = useState<string[]>(item.tags ?? [])
   const [pinned, setPinned] = useState(item.pinned ?? false)
-  const [tagInput, setTagInput] = useState('')
   const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [isPreview, setIsPreview] = useState(false)
   const titleRef = useRef<HTMLInputElement>(null)
 
-  // Reset state and focus title when item changes
+  const { tags, setTags, tagInput, setTagInput, addTag, removeTag, resetTags } = useTagEditor(item.tags ?? [])
+
   useEffect(() => {
     setTitle(item.title)
     setContent(item.content)
-    setTags(item.tags ?? [])
+    resetTags(item.tags ?? [])
     setPinned(item.pinned ?? false)
     setIsPreview(false)
     if (isTodo(item)) {
@@ -81,42 +72,25 @@ export function ItemDetail({ item, type, onBack, onDeleted, onSaved }: ItemDetai
               pinned: data.pinned
             }
       await window.electron.invoke(channel, item.id, updates)
-      setLastSaved(new Date())
       onSaved?.()
     },
     [item.id, type, onSaved]
   )
 
-  const { isSaving } = useAutoSave({ title, content, priority, completed, tags, pinned }, saveItem)
+  const { isSaving, lastSaved } = useAutoSave(
+    { title, content, priority, completed, tags, pinned },
+    saveItem
+  )
 
-  // Auto-clear "Sauvegardé" after 3 seconds
-  useEffect(() => {
-    if (!lastSaved) return
-    const timer = setTimeout(() => setLastSaved(null), 3000)
-    return () => clearTimeout(timer)
-  }, [lastSaved])
-
-  const handleDelete = async () => {
+  const handleDelete = async (): Promise<void> => {
     const channel = type === 'notes' ? 'notes:delete' : 'todos:delete'
     await window.electron.invoke(channel, item.id)
     setShowDeleteModal(false)
     onDeleted()
   }
 
-  const handleExport = async () => {
+  const handleExport = async (): Promise<void> => {
     await window.electron.invoke('item:export', type, item.id)
-  }
-
-  const addTag = (raw: string) => {
-    const tag = raw.toLowerCase().replace(/[^a-z0-9-_]/g, '').trim()
-    if (tag && !tags.includes(tag)) {
-      setTags((prev) => [...prev, tag])
-    }
-    setTagInput('')
-  }
-
-  const removeTag = (tag: string) => {
-    setTags((prev) => prev.filter((t) => t !== tag))
   }
 
   return (
@@ -138,20 +112,16 @@ export function ItemDetail({ item, type, onBack, onDeleted, onSaved }: ItemDetai
             <span className="text-xs text-ink-light font-ui opacity-70 mr-1">Sauvegardé</span>
           ) : null}
 
-          {/* Pin toggle */}
           <button
             onClick={() => setPinned((p) => !p)}
             className={`p-1.5 rounded transition-colors ${
-              pinned
-                ? 'text-amber-500 hover:text-amber-600'
-                : 'text-ink-light hover:text-ink'
+              pinned ? 'text-amber-500 hover:text-amber-600' : 'text-ink-light hover:text-ink'
             }`}
             title={pinned ? 'Désépingler' : 'Épingler'}
           >
             <FontAwesomeIcon icon={faThumbtack} className="text-xs" />
           </button>
 
-          {/* Preview toggle */}
           <button
             onClick={() => setIsPreview((p) => !p)}
             className="p-1.5 rounded text-ink-light hover:text-ink transition-colors"
@@ -160,7 +130,6 @@ export function ItemDetail({ item, type, onBack, onDeleted, onSaved }: ItemDetai
             <FontAwesomeIcon icon={isPreview ? faPencil : faEye} className="text-xs" />
           </button>
 
-          {/* Export */}
           <button
             onClick={handleExport}
             className="p-1.5 rounded text-ink-light hover:text-ink transition-colors"
@@ -278,18 +247,12 @@ export function ItemDetail({ item, type, onBack, onDeleted, onSaved }: ItemDetai
 
       {/* Editor */}
       <div className="flex-1 overflow-hidden">
-        <Editor
-          content={content}
-          onChange={setContent}
-          editable={!isPreview}
-        />
+        <Editor content={content} onChange={setContent} editable={!isPreview} />
       </div>
 
       {/* Footer */}
       <div className="px-4 py-2 border-t border-paper-border bg-paper-dark/30">
-        <p className="text-xs text-ink-light font-ui">
-          Créé le {formatDate(item.created)}
-        </p>
+        <p className="text-xs text-ink-light font-ui">Créé le {formatDate(item.created)}</p>
       </div>
 
       <DeleteModal

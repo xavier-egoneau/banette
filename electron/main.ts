@@ -54,7 +54,15 @@ function createWindow(): void {
   }
 }
 
+function pruneNotifiedSlots(): void {
+  const today = new Date().toISOString().split('T')[0]
+  for (const key of notifiedSlots) {
+    if (!key.startsWith(today)) notifiedSlots.delete(key)
+  }
+}
+
 function checkWorkHoursAlerts(): void {
+  pruneNotifiedSlots()
   const { workHours } = getSettings()
   if (!workHours.enabled) return
 

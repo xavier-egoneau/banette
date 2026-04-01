@@ -4,6 +4,8 @@ import { faArrowLeft, faThumbtack, faTrash, faPlay, faStop, faXmark, faGear } fr
 import { TimerProject, TimerSession } from '../types'
 import { DeleteModal } from './DeleteModal'
 import { useAutoSave } from '../hooks/useAutoSave'
+import { useTagEditor } from '../hooks/useTagEditor'
+import { formatDate, formatSeconds } from '../utils/format'
 
 interface TimerDetailProps {
   item: TimerProject
@@ -11,15 +13,6 @@ interface TimerDetailProps {
   onDeleted: () => void
   onSaved?: () => void
   onOpenSettings?: () => void
-}
-
-function formatSeconds(total: number): string {
-  const h = Math.floor(total / 3600)
-  const m = Math.floor((total % 3600) / 60)
-  if (h === 0 && m === 0) return '0min'
-  if (h === 0) return `${m}min`
-  if (m === 0) return `${h}h`
-  return `${h}h ${m}min`
 }
 
 function formatElapsed(seconds: number): string {
@@ -33,27 +26,30 @@ function formatElapsed(seconds: number): string {
   return parts.join(':')
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  })
-}
-
 export function TimerDetail({ item, onBack, onDeleted, onSaved, onOpenSettings }: TimerDetailProps): JSX.Element {
   const [title, setTitle] = useState(item.title)
-  const [tags, setTags] = useState<string[]>(item.tags ?? [])
   const [pinned, setPinned] = useState(item.pinned ?? false)
   const [sessions, setSessions] = useState<TimerSession[]>(item.sessions ?? [])
   const [runningSince, setRunningSince] = useState<string | null>(item.running_since)
   const [elapsed, setElapsed] = useState(0)
-  const [tagInput, setTagInput] = useState('')
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null)
   const [workHoursEnabled, setWorkHoursEnabled] = useState(true)
-  const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const titleRef = useRef<HTMLInputElement>(null)
+
+  const { tags, tagInput, setTagInput, addTag, removeTag, resetTags } = useTagEditor(item.tags ?? [])
+
+  useEffect(() => {
+    setTitle(item.title)
+    resetTags(item.tags ?? [])
+    setPinned(item.pinned ?? false)
+    setSessions(item.sessions ?? [])
+    setRunningSince(item.running_since)
+    requestAnimationFrame(() => {
+      titleRef.current?.focus()
+      titleRef.current?.select()
+    })
+  }, [item.id])
 
   // Check work hours config whenever timer is active
   useEffect(() => {
@@ -64,18 +60,7 @@ export function TimerDetail({ item, onBack, onDeleted, onSaved, onOpenSettings }
     })
   }, [runningSince])
 
-  useEffect(() => {
-    setTitle(item.title)
-    setTags(item.tags ?? [])
-    setPinned(item.pinned ?? false)
-    setSessions(item.sessions ?? [])
-    setRunningSince(item.running_since)
-    requestAnimationFrame(() => {
-      titleRef.current?.focus()
-      titleRef.current?.select()
-    })
-  }, [item.id])
-
+  // Live timer counter
   useEffect(() => {
     if (!runningSince) {
       setElapsed(0)
@@ -96,19 +81,12 @@ export function TimerDetail({ item, onBack, onDeleted, onSaved, onOpenSettings }
         tags: data.tags,
         pinned: data.pinned
       })
-      setLastSaved(new Date())
       onSaved?.()
     },
     [item.id, onSaved]
   )
 
-  const { isSaving } = useAutoSave({ title, tags, pinned }, saveMetadata)
-
-  useEffect(() => {
-    if (!lastSaved) return
-    const t = setTimeout(() => setLastSaved(null), 3000)
-    return () => clearTimeout(t)
-  }, [lastSaved])
+  const { isSaving, lastSaved } = useAutoSave({ title, tags, pinned }, saveMetadata)
 
   const handleStart = async (): Promise<void> => {
     const now = new Date().toISOString()
@@ -147,7 +125,9 @@ export function TimerDetail({ item, onBack, onDeleted, onSaved, onOpenSettings }
       if (s.id !== id) return s
       const h = field === 'hours' ? Math.max(0, value) : Math.floor(s.seconds / 3600)
       const m = field === 'minutes' ? Math.min(59, Math.max(0, value)) : Math.floor((s.seconds % 3600) / 60)
-      return { ...s, seconds: h * 3600 + m * 60 }
+      const newSeconds = h * 3600 + m * 60
+      if (newSeconds === 0) return s  // Prevent 0-second sessions
+      return { ...s, seconds: newSeconds }
     })
     const newTotal = updated.reduce((sum, s) => sum + s.seconds, 0)
     setSessions(updated)
@@ -168,14 +148,6 @@ export function TimerDetail({ item, onBack, onDeleted, onSaved, onOpenSettings }
     setShowDeleteModal(false)
     onDeleted()
   }
-
-  const addTag = (raw: string): void => {
-    const tag = raw.toLowerCase().replace(/[^a-z0-9-_]/g, '').trim()
-    if (tag && !tags.includes(tag)) setTags((prev) => [...prev, tag])
-    setTagInput('')
-  }
-
-  const removeTag = (tag: string): void => setTags((prev) => prev.filter((t) => t !== tag))
 
   const totalSeconds = sessions.reduce((sum, s) => sum + s.seconds, 0)
 

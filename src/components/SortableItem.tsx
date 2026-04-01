@@ -3,6 +3,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faGripVertical, faTrash, faThumbtack, faCircle } from '@fortawesome/free-solid-svg-icons'
 import { AnyItem, isTodo, isTimerProject, Priority } from '../types'
+import { formatDate, formatSeconds } from '../utils/format'
 
 function getPriorityColor(priority: Priority): string {
   switch (priority) {
@@ -18,23 +19,6 @@ function getPriorityLabel(priority: Priority): string {
     case 'normale': return 'Normale'
     case 'basse': return 'Basse'
   }
-}
-
-function formatTotalSeconds(total: number): string {
-  const h = Math.floor(total / 3600)
-  const m = Math.floor((total % 3600) / 60)
-  if (h === 0 && m === 0) return '0min'
-  if (h === 0) return `${m}min`
-  if (m === 0) return `${h}h`
-  return `${h}h ${m}min`
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  })
 }
 
 interface SortableItemProps {
@@ -156,7 +140,7 @@ export function SortableItem({
               </span>
             )}
             <span className="text-xs font-ui text-ink-light">
-              {formatTotalSeconds(item.total_seconds)}
+              {formatSeconds(item.total_seconds)}
             </span>
           </>
         )}

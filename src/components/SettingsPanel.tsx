@@ -86,8 +86,6 @@ export function SettingsPanel({ onClose, onStorageChanged }: SettingsPanelProps)
     saveWorkHours({ ...workHours, days })
   }
 
-  const isCustomPath = storagePath !== defaultPath || storagePath !== ''
-
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-ink/30 backdrop-blur-sm" onClick={onClose}>
       <div

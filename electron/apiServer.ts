@@ -1,19 +1,13 @@
 import { createServer, IncomingMessage, Server, ServerResponse } from 'http'
 import { AddressInfo } from 'net'
 import {
-  createNote,
-  createTodo,
-  deleteNote,
-  deleteTodo,
+  createNote, createTodo, createTimer,
+  deleteNote, deleteTodo, deleteTimer,
   getCurrentStoragePath,
-  getNote,
-  getTodo,
-  listNotes,
-  listTodos,
-  NoteFile,
-  TodoFile,
-  updateNote,
-  updateTodo
+  getNote, getTodo, getTimer,
+  listNotes, listTodos, listTimers,
+  NoteFile, TodoFile, TimerFile,
+  updateNote, updateTodo, updateTimer
 } from './fileSystem'
 
 type Priority = 'haute' | 'normale' | 'basse'
@@ -272,6 +266,72 @@ async function handleTodos(req: IncomingMessage, res: ServerResponse, pathname: 
   sendJson(res, 405, { error: 'Méthode non autorisée' })
 }
 
+async function handleTimers(req: IncomingMessage, res: ServerResponse, pathname: string): Promise<void> {
+  if (pathname === '/api/timers' && req.method === 'GET') {
+    sendJson(res, 200, { data: listTimers() })
+    return
+  }
+
+  if (pathname === '/api/timers' && req.method === 'POST') {
+    const body = await readJsonBody(req)
+    const timer = createTimer(normalizeTitle(body.title, 'Nouveau projet'))
+    const updates = {
+      tags: normalizeTags(body.tags),
+      pinned: normalizePinned(body.pinned)
+    }
+    const saved = updateTimer(timer.id, updates) ?? timer
+    sendJson(res, 201, { data: saved })
+    return
+  }
+
+  const id = parseId(pathname)
+  if (!id) {
+    sendJson(res, 404, { error: 'Route introuvable' })
+    return
+  }
+
+  if (req.method === 'GET') {
+    const timer = getTimer(id)
+    if (!timer) {
+      sendJson(res, 404, { error: 'Timer introuvable' })
+      return
+    }
+    sendJson(res, 200, { data: timer })
+    return
+  }
+
+  if (req.method === 'PATCH') {
+    const existing = getTimer(id)
+    if (!existing) {
+      sendJson(res, 404, { error: 'Timer introuvable' })
+      return
+    }
+    const body = await readJsonBody(req)
+    const updates: Partial<Omit<TimerFile, 'id' | 'created'>> = {}
+    if ('title' in body) updates.title = normalizeTitle(body.title, existing.title)
+    if ('tags' in body) updates.tags = normalizeTags(body.tags)
+    if ('pinned' in body) updates.pinned = normalizePinned(body.pinned)
+    if ('sessions' in body && Array.isArray(body.sessions)) updates.sessions = body.sessions as TimerFile['sessions']
+    if ('running_since' in body) updates.running_since = body.running_since ? String(body.running_since) : null
+    if ('total_seconds' in body && typeof body.total_seconds === 'number') updates.total_seconds = body.total_seconds
+    const updated = updateTimer(id, updates)
+    sendJson(res, 200, { data: updated })
+    return
+  }
+
+  if (req.method === 'DELETE') {
+    const deleted = deleteTimer(id)
+    if (!deleted) {
+      sendJson(res, 404, { error: 'Timer introuvable' })
+      return
+    }
+    sendNoContent(res)
+    return
+  }
+
+  sendJson(res, 405, { error: 'Méthode non autorisée' })
+}
+
 async function requestListener(req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
     const url = new URL(req.url ?? '/', 'http://127.0.0.1')
@@ -304,6 +364,11 @@ async function requestListener(req: IncomingMessage, res: ServerResponse): Promi
 
     if (pathname === '/api/todos' || pathname.startsWith('/api/todos/')) {
       await handleTodos(req, res, pathname)
+      return
+    }
+
+    if (pathname === '/api/timers' || pathname.startsWith('/api/timers/')) {
+      await handleTimers(req, res, pathname)
       return
     }
 
