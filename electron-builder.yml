@@ -1,5 +1,6 @@
 appId: com.banette.app
 productName: Banette
+afterPack: scripts/afterPack.js
 directories:
   buildResources: build
 files:
@@ -11,6 +12,8 @@ files:
 extraResources:
   - from: build/icon.ico
     to: icon.ico
+  - from: build/icon.png
+    to: icon.png
 asarUnpack:
   - resources/**
 win:
@@ -38,3 +41,5 @@ linux:
     - snap
   maintainer: electronjs.org
   category: Utility
+  executableArgs:
+    - --no-sandbox

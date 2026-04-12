@@ -1,7 +1,12 @@
 import { app, BrowserWindow, ipcMain, Notification, shell, dialog, globalShortcut } from 'electron'
 import * as fs from 'fs'
 import { join } from 'path'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+
+// Linux: chrome-sandbox requires setuid root — disable OS sandbox to allow running without it
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('no-sandbox')
+}
+
 import {
   listNotes, getNote, createNote, updateNote, deleteNote, reorderNotes,
   listTodos, getTodo, createTodo, updateTodo, deleteTodo, reorderTodos,
@@ -24,13 +29,19 @@ function showMainWindow(): void {
 }
 
 function getWindowIconPath(): string | undefined {
-  if (process.platform !== 'win32') return undefined
-
-  if (app.isPackaged) {
-    return join(process.resourcesPath, 'icon.ico')
+  if (process.platform === 'linux') {
+    return app.isPackaged
+      ? join(process.resourcesPath, 'icon.png')
+      : join(__dirname, '../../build/icon.png')
   }
 
-  return join(__dirname, '../../build/icon.ico')
+  if (process.platform === 'win32') {
+    return app.isPackaged
+      ? join(process.resourcesPath, 'icon.ico')
+      : join(__dirname, '../../build/icon.ico')
+  }
+
+  return undefined
 }
 
 function createWindow(): void {
@@ -76,7 +87,7 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+  if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
@@ -268,10 +279,24 @@ function registerIpcHandlers(): void {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.banette.app')
+  if (process.platform === 'win32') {
+    app.setAppUserModelId(app.isPackaged ? 'com.banette.app' : process.execPath)
+  }
 
   app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
+    window.webContents.on('before-input-event', (event, input) => {
+      if (input.type === 'keyDown') {
+        if (app.isPackaged) {
+          if (input.code === 'KeyR' && (input.control || input.meta)) event.preventDefault()
+          if (input.code === 'KeyI' && (input.alt && input.meta || input.control && input.shift)) event.preventDefault()
+        } else {
+          if (input.code === 'F12') {
+            if (window.webContents.isDevToolsOpened()) window.webContents.closeDevTools()
+            else window.webContents.openDevTools({ mode: 'undocked' })
+          }
+        }
+      }
+    })
   })
 
   globalShortcut.register('CommandOrControl+Shift+B', () => {
